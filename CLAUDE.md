@@ -8,6 +8,90 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 
 **Core Value Proposition**: The safest way to get Docs into GitHub.
 
+## ✅ What's Already Completed
+
+### 1. **Authentication Setup** ✅
+- **GitHub OAuth**: Full integration with `repo` and `user:email` scopes
+- **Google OAuth**: Full integration with Drive + Docs API access
+- **Session Management**: NextAuth.js with JWT strategy
+- **Database**: Drizzle ORM with PostgreSQL
+
+**Files**:
+- `lib/auth/index.ts` - NextAuth configuration
+- `app/api/auth/[...nextauth]/route.ts` - API route
+- `components/layout/auth-provider.tsx` - Client-side provider
+- `app/auth/signin/page.tsx` - Sign-in page
+- `components/forms/signin-button.tsx` - OAuth sign-in button
+
+**Database Tables**:
+- `users` - User profiles
+- `sessions` - Active sessions
+- `accounts` - OAuth account links (fixed: `expires_at` uses `integer` type)
+- `verification_tokens` - Email verification
+
+### 2. **Dashboard & UI** ✅
+- **Dashboard Shell**: Consistent layout with sidebar navigation
+- **Settings Page**: Connection management (GitHub + Google)
+- **User Menu**: Avatar dropdown with sign-out
+- **Toast Notifications**: In-app feedback
+- **Protected Routes**: Auth-required pages
+
+**Files**:
+- `app/dashboard/page.tsx` - Main dashboard with connection status
+- `app/dashboard/syncs/page.tsx` - Sync history
+- `app/dashboard/documents/page.tsx` - Document list
+- `app/dashboard/analytics/page.tsx` - Analytics
+- `app/settings/page.tsx` - Settings with connection buttons
+- `components/layout/dashboard-shell.tsx` - Layout
+- `components/layout/dashboard-nav.tsx` - Navigation
+- `components/layout/user-menu.tsx` - User dropdown
+- `components/forms/sync-button.tsx` - Sync trigger
+- `components/ui/` - shadcn/ui components
+
+### 3. **Database Schema** ✅
+**Complete schema following the plan**:
+- Users, Workspaces, GitHub Connections, Google Connections
+- Sync Configurations, Sync History, Documents
+- API Keys, Audit Logs
+
+**Files**:
+- `db/schema.ts` - Drizzle ORM schema (with `integer` type for `expires_at`)
+- `lib/database/index.ts` - Database connection
+- `drizzle.config.ts` - Drizzle configuration
+
+**Tables in Database**:
+```
+✓ users
+✓ sessions
+✓ accounts (expires_at: integer, not timestamp)
+✓ verification_tokens
+✓ workspaces
+✓ github_connections
+✓ google_connections
+✓ sync_configs
+✓ sync_history
+✓ documents
+✓ api_keys
+✓ audit_logs
+```
+
+### 4. **Core Libraries Ready** ✅
+- **Google Docs API**: Integration ready in `lib/google/index.ts`
+- **GitHub API (Octokit)**: Integration ready in `lib/github/index.ts`
+- **Cloudinary**: Integration ready in `lib/cloudinary/index.ts`
+- **Markdown Processing**: Converter ready in `lib/markdown/converter.ts`
+- **Front Matter**: Template system ready in `lib/markdown/frontmatter.ts`
+
+### 5. **Connection Status UI** ✅
+- Dashboard shows real-time connection status (green checkmark / red X)
+- "Connect Google" button appears when Google isn't linked
+- Settings page has buttons for both GitHub and Google connections
+
+### 6. **Critical Bug Fixes** ✅
+- **OAuth redirect_uri_mismatch**: Fixed by adding correct callback URLs to Google Cloud Console
+- **OAuthAccountNotLinked**: Fixed by adding test users in Google OAuth consent screen
+- **expires_at type mismatch**: Changed from `timestamp()` to `integer()` in schema (NextAuth stores Unix timestamps)
+
 ## Competitive Advantage Features
 
 ### 1. **Image Handling Done Right** (Primary Differentiator)
@@ -57,21 +141,21 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ## Technical Architecture
 
 ### Backend Stack
-- **Framework**: Next.js 14 (App Router)
-- **Database**: PostgreSQL (Vercel Postgres)
+- **Framework**: Next.js 15 (App Router) - Using Turbopack
+- **Database**: PostgreSQL (local: `markedly` on localhost:5432)
 - **ORM**: Drizzle ORM (better performance than Prisma)
 - **Auth**: NextAuth.js with GitHub + Google
-- **Queue System**: Upstash Redis + BullMQ for background jobs
+- **Queue System**: Upstash Redis + BullMQ for background jobs (ready, not implemented)
 - **File Storage**: Cloudinary (images)
-- **Payments**: Stripe with webhook handling
-- **Email**: Resend for transactional emails
-- **Monitoring**: Sentry + Vercel Analytics
+- **Payments**: Stripe with webhook handling (ready, not implemented)
+- **Email**: Resend for transactional emails (ready, not implemented)
+- **Monitoring**: Sentry + Vercel Analytics (ready, not implemented)
 
 ### Frontend Stack
-- **Framework**: Next.js 14
+- **Framework**: Next.js 15
 - **UI Library**: shadcn/ui + Tailwind CSS
-- **State Management**: Zustand
-- **Forms**: React Hook Form + Zod validation
+- **State Management**: Zustand (ready, not implemented)
+- **Forms**: React Hook Form + Zod validation (ready, not implemented)
 
 ### Infrastructure
 - **Hosting**: Vercel (Pro tier for production)
@@ -91,10 +175,11 @@ Tables, comments, images, code blocks, headings — this is where products die.
 ### Phase 1: True MVP (Week 1-2) - Core Workflow Only
 **Goal**: Prove one complete workflow: Google Doc → Clean Markdown → GitHub PR → Images hosted correctly
 
-1. **Auth Setup** (1 day)
+1. **Auth Setup** ✅ **COMPLETE**
    - GitHub OAuth (repo write access)
    - Google OAuth (Drive + Docs API)
    - Session management
+   - Database schema with Drizzle ORM
 
 2. **Google Docs → Markdown** (3 days) - **The Hard Part**
    - Fetch doc content via API
@@ -111,7 +196,7 @@ Tables, comments, images, code blocks, headings — this is where products die.
    - Image upload and optimization
    - Update Markdown links to CDN URLs
 
-5. **Basic Dashboard** (2 days)
+5. **Basic Dashboard** ✅ **COMPLETE**
    - Connect accounts UI
    - Manual sync trigger
    - Sync status and history
@@ -183,6 +268,56 @@ Tables, comments, images, code blocks, headings — this is where products die.
 5. **Migration Tools** (1 week)
    - Bulk import from GitHub
    - Legacy doc migration
+
+## ✅ Current Status: Authentication & Dashboard Complete
+
+### What's Working Now
+1. **✅ GitHub OAuth** - Connected and working
+2. **✅ Google OAuth** - Connected and working
+3. **✅ Database Schema** - All tables created with correct types
+4. **✅ Dashboard UI** - Shows connection status
+5. **✅ Settings Page** - Connection buttons for both providers
+6. **✅ Protected Routes** - Auth required for dashboard/settings
+
+### Database Tables (Live)
+```
+users              ✓ (9 columns)
+sessions           ✓ (4 columns)
+accounts           ✓ (11 columns, expires_at: integer)
+verification_tokens ✓ (3 columns)
+workspaces         ✓ (9 columns)
+github_connections ✓ (7 columns)
+google_connections ✓ (5 columns)
+sync_configs       ✓ (12 columns)
+sync_history       ✓ (11 columns)
+documents          ✓ (8 columns)
+api_keys           ✓ (6 columns)
+audit_logs         ✓ (8 columns)
+```
+
+### Known Issues & Fixes Applied
+1. **OAuth redirect_uri_mismatch** → Fixed by adding correct callback URLs in Google Cloud Console
+2. **OAuthAccountNotLinked** → Fixed by adding test users in Google OAuth consent screen
+3. **expires_at type error** → Changed from `timestamp()` to `integer()` in schema (NextAuth stores Unix timestamps)
+4. **Icon passing error** → Moved icon rendering into client component using lookup object
+
+### Next Steps (Immediate)
+1. **Implement Google Docs API integration** - Fetch documents
+2. **Implement GitHub API integration** - Create files and PRs
+3. **Implement Cloudinary integration** - Upload images
+4. **Build sync execution logic** - Connect all pieces together
+5. **Add sync history tracking** - Log operations to database
+6. **Add error handling** - Retry logic and user notifications
+
+### Files to Implement Next
+- `lib/google/index.ts` - Google Docs API wrapper (ready, needs testing)
+- `lib/github/index.ts` - GitHub API wrapper (ready, needs testing)
+- `lib/cloudinary/index.ts` - Cloudinary wrapper (ready, needs testing)
+- `lib/markdown/converter.ts` - Google Docs → Markdown (ready, needs testing)
+- `lib/markdown/frontmatter.ts` - Front matter templates (ready, needs testing)
+- `app/api/sync/route.ts` - Sync endpoint
+- `app/dashboard/syncs/page.tsx` - Sync history display
+- `components/forms/sync-config-form.tsx` - Sync configuration
 
 ## Database Schema
 

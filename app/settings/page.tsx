@@ -3,6 +3,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { Separator } from "@/components/ui/separator";
+import { SignInButton } from "@/components/forms/signin-button";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -35,7 +36,7 @@ export default async function SettingsPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Connect a GitHub account to enable syncing documents to your repositories.
               </p>
-              {/* GitHub connection button would go here */}
+              <SignInButton provider="github" label="Connect GitHub" />
             </CardContent>
           </Card>
 
@@ -50,7 +51,7 @@ export default async function SettingsPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Connect a Google account to access your Google Docs for syncing.
               </p>
-              {/* Google connection button would go here */}
+              <SignInButton provider="google" label="Connect Google" />
             </CardContent>
           </Card>
 

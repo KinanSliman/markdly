@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   jsonb,
+  integer,
 } from "drizzle-orm/pg-core";
 
 // Users table (for Auth.js / NextAuth)
@@ -39,7 +40,7 @@ export const accounts = pgTable("accounts", {
   providerAccountId: text("providerAccountId").notNull(),
   refresh_token: text("refresh_token"),
   access_token: text("access_token"),
-  expires_at: timestamp("expires_at"),
+  expires_at: integer("expires_at"), // NextAuth stores this as Unix timestamp (number)
   token_type: text("token_type"),
   scope: text("scope"),
   id_token: text("id_token"),
