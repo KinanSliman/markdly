@@ -1,7 +1,14 @@
 import { db } from "@/lib/database";
 import { syncHistory, documents, syncConfigs, githubConnections, googleConnections } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { convertGoogleDocToMarkdown, processCodeBlocks, fixHeadingHierarchy } from "@/lib/markdown/converter";
+import {
+  convertGoogleDocToMarkdown,
+  processCodeBlocks,
+  fixHeadingHierarchy,
+  cleanupWhitespace,
+  validateMarkdown,
+  normalizeListMarkers
+} from "@/lib/markdown/converter";
 import { generateFrontMatter, wrapWithFrontMatter, getTemplateByFramework, extractVariablesFromContent } from "@/lib/markdown/frontmatter";
 import { extractImageUrls, processImagesInMarkdown } from "@/lib/cloudinary";
 import { createGitHubWorkflow } from "@/lib/github";
@@ -84,7 +91,19 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
     // 7. Fix heading hierarchy
     markdownContent = fixHeadingHierarchy(markdownContent);
 
-    // 8. Extract and process images (Cloudinary)
+    // 8. Normalize list markers
+    markdownContent = normalizeListMarkers(markdownContent);
+
+    // 9. Cleanup whitespace
+    markdownContent = cleanupWhitespace(markdownContent);
+
+    // 10. Validate markdown
+    const validation = validateMarkdown(markdownContent);
+    if (!validation.valid) {
+      console.warn("Markdown validation warnings:", validation.warnings);
+    }
+
+    // 11. Extract and process images (Cloudinary)
     const imageUrls = extractImageUrls(markdownContent);
     if (imageUrls.length > 0 && syncConfig.imageStrategy === "cloudinary") {
       markdownContent = await processImagesInMarkdown(markdownContent, imageUrls, {
@@ -92,23 +111,23 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       });
     }
 
-    // 9. Generate front matter
+    // 12. Generate front matter
     const variables = extractVariablesFromContent(markdownContent, googleDoc.name);
     const template = syncConfig.frontmatterTemplate || getTemplateByFramework(syncConfig.framework || "nextjs");
     const frontMatter = generateFrontMatter(template, variables);
     const finalContent = wrapWithFrontMatter(markdownContent, frontMatter);
 
-    // 10. Generate file path
+    // 13. Generate file path
     const fileName = googleDoc.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") + ".md";
     const filePath = `${syncConfig.outputPath || "content/"}${fileName}`;
 
-    // 11. Generate branch name
+    // 14. Generate branch name
     const branchName = `markdly/${googleDoc.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
 
-    // 12. Commit to GitHub and create PR
+    // 15. Commit to GitHub and create PR
     const { commitSha, prNumber, prUrl } = await createGitHubWorkflow({
       owner: githubConn.repoOwner!,
       repo: githubConn.repoName!,
@@ -120,7 +139,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       accessToken: githubConn.accessToken!,
     });
 
-    // 13. Update or create document tracking
+    // 16. Update or create document tracking
     const existingDoc = await db
       .select()
       .from(documents)
@@ -159,7 +178,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
         });
     }
 
-    // 14. Update sync history with success
+    // 17. Update sync history with success
     await db
       .update(syncHistory)
       .set({

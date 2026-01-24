@@ -5,7 +5,9 @@
       "Bash(npx drizzle-kit:*)",
       "Bash(ls:*)",
       "Bash(find:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsx:*)"
     ]
   }
 }
