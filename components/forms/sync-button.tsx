@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/lib/hooks/use-toast";
 import { useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
+import Link from "next/link";
 
 export function SyncButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -39,18 +40,11 @@ export function SyncButton() {
   };
 
   return (
-    <Button onClick={handleSync} disabled={isLoading} className="w-full">
-      {isLoading ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Syncing...
-        </>
-      ) : (
-        <>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Sync Document
-        </>
-      )}
+    <Button asChild className="w-full">
+      <Link href="/settings/sync-configs">
+        <RefreshCw className="mr-2 h-4 w-4" />
+        Create Sync Configuration
+      </Link>
     </Button>
   );
 }

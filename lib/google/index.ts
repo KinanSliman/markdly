@@ -17,7 +17,7 @@ export async function listGoogleDocs(accessToken: string): Promise<Array<{ id: s
     return response.data.files?.map((file) => ({
       id: file.id!,
       name: file.name!,
-      modifiedTime: file.modifiedTime,
+      modifiedTime: file.modifiedTime || undefined,
     })) || [];
   } catch (error) {
     console.error("Error listing Google Docs:", error);
@@ -138,7 +138,14 @@ export async function exchangeCodeForTokens(code: string): Promise<{
 
   try {
     const { tokens } = await oauth2Client.getToken(code);
-    return tokens;
+    if (!tokens.access_token) {
+      throw new Error("No access token received");
+    }
+    return {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || undefined,
+      id_token: tokens.id_token || undefined,
+    };
   } catch (error) {
     console.error("Error exchanging code for tokens:", error);
     throw new Error("Failed to exchange code for tokens");

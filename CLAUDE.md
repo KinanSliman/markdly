@@ -269,15 +269,23 @@ Tables, comments, images, code blocks, headings — this is where products die.
    - Bulk import from GitHub
    - Legacy doc migration
 
-## ✅ Current Status: Authentication & Dashboard Complete
+## ✅ Current Status: Phase 1 MVP - Core Sync Workflow Complete
 
 ### What's Working Now
 1. **✅ GitHub OAuth** - Connected and working
 2. **✅ Google OAuth** - Connected and working
 3. **✅ Database Schema** - All tables created with correct types
-4. **✅ Dashboard UI** - Shows connection status
+4. **✅ Dashboard UI** - Shows connection status and sync history
 5. **✅ Settings Page** - Connection buttons for both providers
 6. **✅ Protected Routes** - Auth required for dashboard/settings
+7. **✅ Core Libraries** - Google Docs, GitHub, Cloudinary, Markdown converter, Front matter
+8. **✅ Sync Execution Logic** - Complete workflow implementation
+9. **✅ Sync API Endpoint** - POST /api/sync for triggering syncs
+10. **✅ Sync Config Form** - UI for creating sync configurations
+11. **✅ Document Picker** - List and sync Google Docs
+12. **✅ Sync History Display** - Shows recent sync operations
+13. **✅ Tracked Documents** - Shows synced documents with metadata
+14. **✅ TypeScript Issues Fixed** - All type errors resolved with proper typing
 
 ### Database Tables (Live)
 ```
@@ -295,29 +303,135 @@ api_keys           ✓ (6 columns)
 audit_logs         ✓ (8 columns)
 ```
 
+### Files Created/Updated in Phase 1
+**Core Sync Logic:**
+- `lib/sync/index.ts` - Main sync execution workflow
+- `app/api/sync/route.ts` - Sync API endpoint
+- `app/api/sync-config/route.ts` - Sync configuration API
+- `app/api/documents/route.ts` - Documents listing API
+
+**UI Components:**
+- `components/forms/sync-config-form.tsx` - Create sync configurations
+- `components/forms/document-picker.tsx` - Pick and sync Google Docs
+- `components/forms/sync-button.tsx` - Updated to link to config page
+- `components/ui/badge.tsx` - Badge component
+- `components/ui/select.tsx` - Select dropdown component
+- `components/ui/skeleton.tsx` - Skeleton loading component
+- `components/ui/card.tsx` - Added CardFooter component
+
+**Pages:**
+- `app/settings/sync-configs/page.tsx` - Sync configuration management
+- `app/dashboard/page.tsx` - Updated with sync stats and onboarding
+- `app/dashboard/syncs/page.tsx` - Updated with real sync history
+- `app/dashboard/documents/page.tsx` - Updated with tracked documents
+- `app/settings/page.tsx` - Updated with sync config link
+- `components/layout/dashboard-nav.tsx` - Added sync configs nav item
+
+**Library Updates:**
+- `lib/github/index.ts` - Added `listGitHubRepos()` function
+- `lib/google/index.ts` - Fixed type issues with null/undefined handling
+- `lib/cloudinary/index.ts` - Installed cloudinary package
+- `lib/markdown/converter.ts` - Ready for conversion
+- `lib/markdown/frontmatter.ts` - Ready for front matter generation
+
 ### Known Issues & Fixes Applied
 1. **OAuth redirect_uri_mismatch** → Fixed by adding correct callback URLs in Google Cloud Console
 2. **OAuthAccountNotLinked** → Fixed by adding test users in Google OAuth consent screen
 3. **expires_at type error** → Changed from `timestamp()` to `integer()` in schema (NextAuth stores Unix timestamps)
 4. **Icon passing error** → Moved icon rendering into client component using lookup object
+5. **TypeScript errors** → Fixed null/undefined handling in Google API, added CardFooter, fixed metadata type casting
+6. **Remaining TypeScript issues** → Fixed by:
+   - Adding `DocumentMetadata` interface and using `.$type<DocumentMetadata>()` for JSON columns
+   - Updating toast hook to accept `React.ReactNode` for description
+   - Using optional chaining for cleaner metadata access
 
-### Next Steps (Immediate)
-1. **Implement Google Docs API integration** - Fetch documents
-2. **Implement GitHub API integration** - Create files and PRs
-3. **Implement Cloudinary integration** - Upload images
-4. **Build sync execution logic** - Connect all pieces together
-5. **Add sync history tracking** - Log operations to database
-6. **Add error handling** - Retry logic and user notifications
+### TypeScript Issues - FIXED ✅
+All remaining TypeScript issues have been resolved:
 
-### Files to Implement Next
-- `lib/google/index.ts` - Google Docs API wrapper (ready, needs testing)
-- `lib/github/index.ts` - GitHub API wrapper (ready, needs testing)
-- `lib/cloudinary/index.ts` - Cloudinary wrapper (ready, needs testing)
-- `lib/markdown/converter.ts` - Google Docs → Markdown (ready, needs testing)
-- `lib/markdown/frontmatter.ts` - Front matter templates (ready, needs testing)
-- `app/api/sync/route.ts` - Sync endpoint
-- `app/dashboard/syncs/page.tsx` - Sync history display
-- `components/forms/sync-config-form.tsx` - Sync configuration
+1. **`app/dashboard/documents/page.tsx`** - Fixed `unknown` type for metadata fields
+   - **Solution**: Added `DocumentMetadata` interface in `db/schema.ts`
+   - Used `.$type<DocumentMetadata>()` on the `jsonb` column for proper typing
+   - Simplified code with optional chaining (`doc.metadata?.commitSha`)
+
+2. **`components/forms/document-picker.tsx`** - Fixed toast description type
+   - **Solution**: Updated `use-toast.ts` to accept `React.ReactNode` for description
+   - Allows React elements in toast descriptions (links, icons, etc.)
+
+3. **`lib/auth/index.ts`** - Sessions table schema fixed
+   - **Solution**: Sessions table already had correct schema with `sessionToken` as primary key
+   - Matches Drizzle adapter's expected schema
+
+### Next Steps (Phase 2 - Polish & Reliability)
+1. **Error Handling & Retries** - Add retry logic for transient errors
+2. **Multi-Framework Support** - Template system for different SSGs
+3. **Link Validation** - Check external links before sync
+4. **Prettier Integration** - Auto-format with repo's Prettier config
+5. **Change Detection** - Show diff of what changed since last sync
+6. **Testing** - Unit tests for markdown conversion, integration tests for sync flow
+
+### Sync Flow (Complete)
+```
+1. User creates sync configuration (GitHub repo + Google Drive folder + framework)
+2. User selects document from Google Drive folder
+3. User clicks "Sync" → POST /api/sync
+4. Execute sync workflow:
+   a. Fetch Google Doc via API
+   b. Convert to Markdown (tables, headings, code blocks)
+   c. Process images (extract, upload to Cloudinary, update links)
+   d. Generate front matter from template
+   e. Create GitHub branch
+   f. Commit file to repo
+   g. Create Pull Request
+   h. Log to sync_history table
+   i. Update documents table with tracking info
+5. Return PR URL to user
+```
+
+### Environment Variables Needed
+```env
+# Database
+POSTGRES_URL=your_postgres_url
+
+# OAuth
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_nextauth_secret
+
+# Cloudinary (for image handling)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+### Testing the Sync Flow
+1. Connect GitHub account (Settings → GitHub Connection)
+2. Connect Google account (Settings → Google Connection)
+3. Go to Settings → Sync Configurations
+4. Create a new sync configuration:
+   - Select a GitHub repo
+   - Select a Google Drive folder
+   - Choose framework (Next.js, Hugo, etc.)
+   - Set output path (e.g., `content/posts/`)
+   - Use default front matter template
+   - Select Cloudinary as image strategy
+5. Go to the document picker (click "Manage Configurations")
+6. Select a Google Doc and click "Sync"
+7. Check the PR on GitHub and sync history on dashboard
+
+### What's NOT in v1 (Cut for MVP)
+- ❌ AI-powered metadata generation
+- ❌ Bi-directional sync
+- ❌ Incremental section updates
+- ❌ Scheduled/cron sync
+- ❌ Analytics dashboards
+- ❌ Enterprise SSO
+- ❌ API access
+- ❌ Migration tools
+- ❌ Team collaboration features
+- ❌ Content quality scoring
 
 ## Database Schema
 

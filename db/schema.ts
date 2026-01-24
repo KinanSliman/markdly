@@ -8,6 +8,13 @@ import {
   integer,
 } from "drizzle-orm/pg-core";
 
+// Document metadata interface for typed JSON columns
+export interface DocumentMetadata {
+  commitSha?: string;
+  prUrl?: string;
+  [key: string]: unknown;
+}
+
 // Users table (for Auth.js / NextAuth)
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -21,8 +28,7 @@ export const users = pgTable("users", {
 
 // Sessions table (for Auth.js / NextAuth)
 export const sessions = pgTable("sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionToken: text("sessionToken").unique().notNull(),
+  sessionToken: text("sessionToken").primaryKey(),
   userId: uuid("userId")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
@@ -124,7 +130,7 @@ export const documents = pgTable("documents", {
   title: text("title"),
   lastSynced: timestamp("last_synced"),
   lastModified: timestamp("last_modified"),
-  metadata: jsonb("metadata"),
+  metadata: jsonb("metadata").$type<DocumentMetadata>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

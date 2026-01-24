@@ -269,3 +269,27 @@ export async function validateRepoAccess(
     return false;
   }
 }
+
+/**
+ * Lists repositories accessible to the authenticated user
+ */
+export async function listGitHubRepos(accessToken: string): Promise<Array<{ name: string; owner: { login: string } }>> {
+  const octokit = new Octokit({
+    auth: accessToken,
+  });
+
+  try {
+    const { data: repos } = await octokit.repos.listForAuthenticatedUser({
+      per_page: 100,
+      sort: "updated",
+    });
+
+    return repos.map((repo) => ({
+      name: repo.name,
+      owner: { login: repo.owner.login },
+    }));
+  } catch (error) {
+    console.error("Error listing GitHub repos:", error);
+    throw new Error("Failed to list GitHub repositories");
+  }
+}

@@ -1,18 +1,19 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { SyncButton } from "@/components/forms/sync-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { SignInButton } from "@/components/forms/signin-button";
-import { Github, Chrome, CheckCircle2, XCircle } from "lucide-react";
+import { Github, Chrome, CheckCircle2, XCircle, ArrowRight, Settings } from "lucide-react";
 import { db } from "@/lib/database";
-import { accounts } from "@/db/schema";
+import { accounts, workspaces, syncConfigs, syncHistory } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { Button } from "@/components/ui/button";
 
 export default async function DashboardPage() {
   const session = await auth();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/api/auth/signin");
   }
 
@@ -20,11 +21,40 @@ export default async function DashboardPage() {
   const userAccounts = await db
     .select({ provider: accounts.provider })
     .from(accounts)
-    .where(eq(accounts.userId, session.user.id));
+    .where(eq(accounts.userId, session.user.id!));
 
   const connectedProviders = new Set(userAccounts.map((a) => a.provider));
   const githubConnected = connectedProviders.has("github");
   const googleConnected = connectedProviders.has("google");
+
+  // Get workspace and sync configs
+  const [workspace] = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.ownerId, session.user.id!));
+
+  let configsCount = 0;
+  let recentSyncs: typeof syncHistory.$inferSelect[] = [];
+
+  if (workspace) {
+    const configs = await db
+      .select()
+      .from(syncConfigs)
+      .where(eq(syncConfigs.workspaceId, workspace.id!));
+
+    configsCount = configs.length;
+
+    if (configs.length > 0) {
+      recentSyncs = await db
+        .select()
+        .from(syncHistory)
+        .where(eq(syncHistory.syncConfigId, configs[0].id!))
+        .orderBy(syncHistory.startedAt)
+        .limit(3);
+    }
+  }
+
+  const allConnected = githubConnected && googleConnected && configsCount > 0;
 
   return (
     <DashboardShell>
@@ -36,14 +66,61 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        {/* Onboarding Banner */}
+        {!allConnected && (
+          <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+            <CardHeader>
+              <CardTitle className="text-blue-900 dark:text-blue-100">
+                {configsCount === 0
+                  ? "Get Started with Markdly"
+                  : "Almost Ready!"}
+              </CardTitle>
+              <CardDescription className="text-blue-700 dark:text-blue-200">
+                {configsCount === 0
+                  ? "Connect your accounts and create your first sync configuration to start syncing documents."
+                  : "Create your first sync configuration to start syncing documents."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {!githubConnected && (
+                  <SignInButton provider="github" label="Connect GitHub" />
+                )}
+                {!googleConnected && (
+                  <SignInButton provider="google" label="Connect Google" />
+                )}
+                {githubConnected && googleConnected && configsCount === 0 && (
+                  <Button asChild>
+                    <Link href="/settings/sync-configs">
+                      Create Sync Configuration
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Start syncing your documents</CardDescription>
+              <CardTitle>Sync Configurations</CardTitle>
+              <CardDescription>Your configured sync workflows</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <SyncButton />
+            <CardContent>
+              <div className="text-3xl font-bold mb-2">{configsCount}</div>
+              <p className="text-sm text-muted-foreground">
+                {configsCount === 0
+                  ? "No configurations yet"
+                  : `Configuration${configsCount > 1 ? "s" : ""} ready`}
+              </p>
+              <Button asChild variant="outline" className="mt-4 w-full">
+                <Link href="/settings/sync-configs">
+                  Manage Configurations
+                  <Settings className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
             </CardContent>
           </Card>
 
@@ -75,21 +152,55 @@ export default async function DashboardPage() {
                   <XCircle className="h-4 w-4 text-red-500" />
                 )}
               </div>
-              {!googleConnected && (
-                <SignInButton provider="google" label="Connect Google" />
-              )}
+              <Button asChild variant="outline" className="mt-2 w-full">
+                <Link href="/settings">
+                  View Connections
+                  <Settings className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Sync History</CardTitle>
-              <CardDescription>Recent sync operations</CardDescription>
+              <CardTitle>Recent Syncs</CardTitle>
+              <CardDescription>Latest sync operations</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                No syncs yet. Create your first sync to see history here.
-              </p>
+              {recentSyncs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No syncs yet. Create your first sync to see history here.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {recentSyncs.map((sync) => (
+                    <div key={sync.id} className="text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium truncate max-w-[150px]">
+                          {sync.docTitle || "Untitled"}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs ${
+                            sync.status === "success"
+                              ? "bg-green-100 text-green-800"
+                              : sync.status === "failed"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {sync.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button asChild variant="outline" className="mt-4 w-full">
+                <Link href="/dashboard/syncs">
+                  View All History
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         </div>

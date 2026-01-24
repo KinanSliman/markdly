@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, Settings, GitBranch, FileText, BarChart3 } from "lucide-react";
+import { Home, Settings, GitBranch, FileText, BarChart3, Cog } from "lucide-react";
 
 const navItems = [
   {
@@ -16,6 +16,11 @@ const navItems = [
     href: "/dashboard/documents",
     label: "Documents",
     icon: FileText,
+  },
+  {
+    href: "/settings/sync-configs",
+    label: "Sync Configs",
+    icon: Cog,
   },
   {
     href: "/dashboard/analytics",
