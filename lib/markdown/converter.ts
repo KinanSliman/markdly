@@ -1,5 +1,9 @@
 import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
+import { uploadImageToCloudinary } from "@/lib/cloudinary";
+
+// Node.js Buffer for converting blobs to base64
+const Buffer = globalThis.Buffer || require("buffer").Buffer;
 
 // Google Docs API types (partial)
 interface DocsParagraph {
@@ -75,11 +79,13 @@ export interface GoogleDocContent {
 /**
  * Fetches a Google Doc and converts it to Markdown
  * Accepts either an access token or refresh token
+ * Optionally processes images and uploads to Cloudinary
  */
 export async function convertGoogleDocToMarkdown(
   docId: string,
   token: string,
-  isAccessToken = true
+  isAccessToken = true,
+  cloudinaryFolder?: string
 ): Promise<GoogleDocContent> {
   // Create an OAuth2Client
   const oauth2Client = new OAuth2Client(
@@ -126,6 +132,27 @@ export async function convertGoogleDocToMarkdown(
       }
     }
 
+    // Process images and upload to Cloudinary if folder is specified
+    if (cloudinaryFolder && images.length > 0) {
+      // Get the access token for fetching images
+      const accessToken = isAccessToken ? token : await oauth2Client.getAccessToken();
+
+      for (const image of images) {
+        try {
+          const cloudinaryUrl = await processGoogleDocImage(image.url, accessToken.token!, cloudinaryFolder);
+          // Replace the image URL in the markdown
+          const escapedUrl = image.url.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
+          const imageRegex = new RegExp(`!\\[(.*?)\\]\\(${escapedUrl}\\)`, "g");
+          markdown = markdown.replace(imageRegex, (match, altText) => {
+            return `![${altText}](${cloudinaryUrl})`;
+          });
+        } catch (error) {
+          console.error(`Failed to process image ${image.url}:`, error);
+          // Keep original URL if upload fails
+        }
+      }
+    }
+
     return {
       title,
       content: markdown.trim(),
@@ -157,6 +184,45 @@ function extractInlineImages(document: DocsDocument): Map<string, string> {
   }
 
   return images;
+}
+
+/**
+ * Fetches an image from Google Docs with authentication and uploads to Cloudinary
+ * Google Docs images require authentication via the access token
+ */
+export async function processGoogleDocImage(
+  imageUrl: string,
+  accessToken: string,
+  folder: string
+): Promise<string> {
+  try {
+    // Google Docs images need to be fetched with the access token
+    // The contentUri is a direct URL but requires OAuth authentication
+    const response = await fetch(imageUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+
+    // Get the image as a blob and convert to base64
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const mimeType = blob.type || "image/png";
+    const dataUri = `data:${mimeType};base64,${base64}`;
+
+    // Upload to Cloudinary
+    const result = await uploadImageToCloudinary(dataUri, { folder });
+
+    return result.secureUrl;
+  } catch (error) {
+    console.error("Error processing Google Doc image:", error);
+    throw error;
+  }
 }
 
 /**

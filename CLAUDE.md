@@ -74,6 +74,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - Automatic token refresh for expired OAuth tokens
 - Detailed sync history with delete functionality
 - Error handling with retry options
+- **Image Handling**: Automatic upload to Cloudinary with CDN URLs
 
 ---
 
@@ -105,6 +106,10 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 **Sync History with Delete** ✅ PASSED
 - Displays all sync operations → Delete button with confirmation → Immediate UI update
 
+**Cloudinary Image Handling** ✅ IMPLEMENTED
+- Images extracted from Google Docs → Uploaded to Cloudinary → Markdown links updated with CDN URLs
+- Preserves Markdown syntax: `![alt](url)` → `![alt](cloudinary-cdn-url)`
+
 ---
 
 ## Database Schema (Key Tables)
@@ -128,12 +133,15 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 2. User clicks "Sync" → POST /api/sync
 3. Execute sync:
    a. Fetch Google Doc (auto-refresh token if expired)
-   b. Convert to Markdown (tables, code blocks, headings)
-   c. Process images (extract, upload to Cloudinary, update links)
-   d. Generate front matter from template
-   e. Create GitHub branch & commit
-   f. Create Pull Request
-   g. Log to sync_history with docTitle
+   b. Convert to Markdown with image processing:
+      - Extract images from Google Doc
+      - Upload to Cloudinary (if imageStrategy = "cloudinary")
+      - Replace URLs with Cloudinary CDN URLs
+      - Process tables, code blocks, headings
+   c. Generate front matter from template
+   d. Create GitHub branch & commit
+   e. Create Pull Request
+   f. Log to sync_history with docTitle
 4. Return PR URL to user
 ```
 
@@ -174,6 +182,9 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ### Library Updates
 - `lib/auth/index.ts` - Added `prompt: "consent"`, `access_type: "offline"`
 - `lib/google/index.ts` - Added token refresh functions and `GoogleReconnectRequiredError`
+- `lib/cloudinary/index.ts` - Updated `processImagesInMarkdown()` to preserve Markdown syntax
+- `lib/markdown/converter.ts` - Added `processGoogleDocImage()` for authenticated image upload
+- `lib/sync/index.ts` - Integrated image processing into converter
 - `app/api/auth/disconnect/route.ts` - Added sync cleanup (sync_history → documents → sync_configs)
 
 ---

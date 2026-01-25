@@ -18,16 +18,17 @@ export interface UploadResult {
 
 /**
  * Uploads an image to Cloudinary
+ * Accepts either a URL or base64 data
  */
 export async function uploadImageToCloudinary(
-  imageUrl: string,
+  imageSource: string,
   options: {
     folder?: string;
     transformation?: any[];
   } = {}
 ): Promise<UploadResult> {
   try {
-    const result = await cloudinary.uploader.upload(imageUrl, {
+    const result = await cloudinary.uploader.upload(imageSource, {
       folder: options.folder || "markdly",
       transformation: options.transformation || [
         { quality: "auto:good" },
@@ -51,42 +52,8 @@ export async function uploadImageToCloudinary(
 }
 
 /**
- * Generates responsive image URLs for srcset
- */
-export function generateResponsiveUrls(
-  publicId: string,
-  widths: number[] = [320, 640, 768, 1024, 1280, 1920]
-): string[] {
-  return widths.map((width) => {
-    return cloudinary.url(publicId, {
-      width,
-      crop: "scale",
-      quality: "auto:good",
-      fetch_format: "auto",
-    });
-  });
-}
-
-/**
- * Generates srcset attribute for responsive images
- */
-export function generateSrcset(publicId: string): string {
-  const urls = generateResponsiveUrls(publicId);
-  return urls.map((url, index) => {
-    const width = [320, 640, 768, 1024, 1280, 1920][index];
-    return `${url} ${width}w`;
-  }).join(", ");
-}
-
-/**
- * Generates sizes attribute for responsive images
- */
-export function generateSizes(): string {
-  return "(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw";
-}
-
-/**
  * Processes markdown content and replaces image URLs with Cloudinary URLs
+ * Preserves Markdown image syntax: ![alt](url)
  */
 export async function processImagesInMarkdown(
   content: string,
@@ -102,15 +69,17 @@ export async function processImagesInMarkdown(
     try {
       const result = await uploadImageToCloudinary(imageUrl, options);
 
-      // Replace the original URL with Cloudinary URL
-      // Handle both absolute URLs and relative paths
-      const escapedUrl = imageUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(escapedUrl, "g");
+      // Replace the original URL with Cloudinary URL in Markdown format
+      // Pattern: ![alt text](url) -> ![alt text](cloudinaryUrl)
+      const escapedUrl = imageUrl.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
 
-      // Use the responsive image HTML format
-      const responsiveImg = `<img src="${result.secureUrl}" srcset="${generateSrcset(result.publicId)}" sizes="${generateSizes()}" alt="" loading="lazy" />`;
+      // Match the full markdown image syntax including the alt text
+      const markdownImageRegex = new RegExp(`!\\[(.*?)\\]\\(${escapedUrl}\\)`, "g");
 
-      processedContent = processedContent.replace(regex, responsiveImg);
+      // Keep the original alt text, just replace the URL
+      processedContent = processedContent.replace(markdownImageRegex, (match, altText) => {
+        return `![${altText}](${result.secureUrl})`;
+      });
     } catch (error) {
       console.error(`Failed to process image ${imageUrl}:`, error);
       // Keep original URL if upload fails
@@ -124,27 +93,13 @@ export async function processImagesInMarkdown(
  * Extracts image URLs from markdown content
  */
 export function extractImageUrls(content: string): string[] {
-  const imageRegex = /!\[.*?\]\((.*?)\)/g;
+  const imageRegex = /!\[(.*?)\]\((.*?)\)/g;
   const urls: string[] = [];
   let match;
 
   while ((match = imageRegex.exec(content)) !== null) {
-    urls.push(match[1]);
+    urls.push(match[2]);
   }
 
   return urls;
-}
-
-/**
- * Generates optimized image tags with lazy loading
- */
-export function generateOptimizedImageTag(
-  url: string,
-  alt: string = "",
-  className: string = ""
-): string {
-  const loadingAttr = "loading=\"lazy\"";
-  const classAttr = className ? `class="${className}"` : "";
-
-  return `<img src="${url}" alt="${alt}" ${loadingAttr} ${classAttr} />`;
 }

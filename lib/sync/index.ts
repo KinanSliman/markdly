@@ -10,7 +10,6 @@ import {
   normalizeListMarkers
 } from "@/lib/markdown/converter";
 import { generateFrontMatter, wrapWithFrontMatter, getTemplateByFramework, extractVariablesFromContent } from "@/lib/markdown/frontmatter";
-import { extractImageUrls, processImagesInMarkdown } from "@/lib/cloudinary";
 import { createGitHubWorkflow } from "@/lib/github";
 import { getGoogleDoc, refreshGoogleAccessToken } from "@/lib/google";
 
@@ -31,7 +30,7 @@ export interface SyncOptions {
 
 /**
  * Main sync execution function
- * Orchestrates the entire workflow: Google Doc → Markdown → Images → GitHub PR
+ * Orchestrates the entire workflow: Google Doc → Images to Cloudinary → Markdown → GitHub PR
  */
 export async function executeSync({ docId, configId, userId }: SyncOptions): Promise<SyncResult> {
   const startTime = new Date();
@@ -88,9 +87,14 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
     let googleDoc;
     let converted;
 
+    // Determine Cloudinary folder based on sync config
+    const cloudinaryFolder = syncConfig.imageStrategy === "cloudinary"
+      ? `markdly/${syncConfig.name}`
+      : undefined;
+
     try {
       googleDoc = await getGoogleDoc(docId, googleToken, !isAccessToken);
-      converted = await convertGoogleDocToMarkdown(docId, googleToken, !isAccessToken);
+      converted = await convertGoogleDocToMarkdown(docId, googleToken, !isAccessToken, cloudinaryFolder);
     } catch (error) {
       // If the error is "Invalid Credentials", try refreshing the access token
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -111,7 +115,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
             googleToken = access_token;
             isAccessToken = true;
             googleDoc = await getGoogleDoc(docId, googleToken, true);
-            converted = await convertGoogleDocToMarkdown(docId, googleToken, true);
+            converted = await convertGoogleDocToMarkdown(docId, googleToken, true, cloudinaryFolder);
           } catch (refreshError) {
             throw new Error(`Failed to refresh Google access token: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
           }
@@ -141,31 +145,23 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       console.warn("Markdown validation warnings:", validation.warnings);
     }
 
-    // 11. Extract and process images (Cloudinary)
-    const imageUrls = extractImageUrls(markdownContent);
-    if (imageUrls.length > 0 && syncConfig.imageStrategy === "cloudinary") {
-      markdownContent = await processImagesInMarkdown(markdownContent, imageUrls, {
-        folder: `markdly/${syncConfig.name}`,
-      });
-    }
-
-    // 12. Generate front matter
+    // 11. Generate front matter
     const variables = extractVariablesFromContent(markdownContent, googleDoc.name);
     const template = syncConfig.frontmatterTemplate || getTemplateByFramework(syncConfig.framework || "nextjs");
     const frontMatter = generateFrontMatter(template, variables);
     const finalContent = wrapWithFrontMatter(markdownContent, frontMatter);
 
-    // 13. Generate file path
+    // 12. Generate file path
     const fileName = googleDoc.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") + ".md";
     const filePath = `${syncConfig.outputPath || "content/"}${fileName}`;
 
-    // 14. Generate branch name
+    // 13. Generate branch name
     const branchName = `markdly/${googleDoc.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
 
-    // 15. Commit to GitHub and create PR
+    // 14. Commit to GitHub and create PR
     const { commitSha, prNumber, prUrl } = await createGitHubWorkflow({
       owner: githubConn.repoOwner!,
       repo: githubConn.repoName!,
@@ -177,7 +173,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       accessToken: githubConn.accessToken!,
     });
 
-    // 16. Update or create document tracking
+    // 15. Update or create document tracking
     const existingDoc = await db
       .select()
       .from(documents)
@@ -216,7 +212,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
         });
     }
 
-    // 17. Update sync history with success
+    // 16. Update sync history with success
     await db
       .update(syncHistory)
       .set({
