@@ -39,7 +39,10 @@ export const {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: "openid email profile https://www.googleapis.com/auth/drive.readonly",
+          scope: "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
+          prompt: "consent",
+          access_type: "offline",
+          include_granted_scopes: "true",
         },
       },
     }),

@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/database";
-import { syncConfigs, workspaces, accounts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { syncConfigs, workspaces, accounts, documents } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { SyncConfigForm } from "@/components/forms/sync-config-form";
 import { listGitHubRepos } from "@/lib/github";
-import { listFilesInFolder } from "@/lib/google";
+import { listAllAccessibleDocsByUserId, GoogleReconnectRequiredError } from "@/lib/google";
+import { SyncButton } from "@/components/forms/sync-button";
+import { ReconnectGoogleButton } from "@/components/forms/reconnect-google-button";
+import { FileText, Calendar, GitCommit } from "lucide-react";
 
 export default async function SyncConfigsPage() {
   const session = await auth();
@@ -46,7 +49,9 @@ export default async function SyncConfigsPage() {
   const googleAccount = userAccounts.find((a) => a.provider === "google");
 
   let githubRepos: Array<{ owner: string; name: string }> = [];
-  let googleFolders: Array<{ id: string; name: string }> = [];
+  let googleDocs: Array<{ id: string; name: string }> = [];
+  let googleReconnectRequired = false;
+  let googleReconnectMessage = "";
 
   if (githubAccount?.accessToken) {
     try {
@@ -60,24 +65,29 @@ export default async function SyncConfigsPage() {
     }
   }
 
-  if (googleAccount?.accessToken) {
+  if (googleAccount) {
     try {
-      console.log("Attempting to list Google Drive folders using access token...");
-      // Use access token directly since refresh token might not be available
-      const folders = await listFilesInFolder("root", googleAccount.accessToken, true);
-      console.log("Google Drive folders:", folders);
-      googleFolders = folders
-        .filter((f) => f.mimeType === "application/vnd.google-apps.folder")
-        .map((f) => ({
-          id: f.id,
-          name: f.name,
-        }));
-      console.log("Filtered Google Drive folders:", googleFolders);
+      console.log("Attempting to list all accessible Google Docs...");
+      // Use the new function that searches for all accessible Google Docs
+      // This includes docs in root, shared docs, and docs in subdirectories
+      // It also handles token refresh automatically if needed
+      const docs = await listAllAccessibleDocsByUserId(session.user.id!);
+      console.log("Google Docs found:", docs.length);
+      googleDocs = docs.map((doc) => ({
+        id: doc.id,
+        name: doc.name,
+      }));
+      console.log("Google Docs:", googleDocs);
     } catch (error) {
-      console.error("Error fetching Google folders:", error);
+      console.error("Error fetching Google Docs:", error);
+      // Check if this is a reconnection error
+      if (error instanceof GoogleReconnectRequiredError) {
+        googleReconnectRequired = true;
+        googleReconnectMessage = error.message;
+      }
     }
   } else {
-    console.log("No Google access token found. accessToken:", googleAccount?.accessToken);
+    console.log("No Google account found");
   }
 
   // Get existing sync configs
@@ -85,6 +95,16 @@ export default async function SyncConfigsPage() {
     .select()
     .from(syncConfigs)
     .where(eq(syncConfigs.workspaceId, workspace.id!));
+
+  // Get tracked documents for each config
+  let trackedDocs: typeof documents.$inferSelect[] = [];
+  if (configs.length > 0) {
+    const configIds = configs.map((c) => c.id).filter((id): id is string => id !== undefined);
+    trackedDocs = await db
+      .select()
+      .from(documents)
+      .where(inArray(documents.syncConfigId, configIds));
+  }
 
   return (
     <DashboardShell>
@@ -110,6 +130,31 @@ export default async function SyncConfigsPage() {
               </p>
             </CardContent>
           </Card>
+        ) : googleReconnectRequired ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Google Account Reconnection Required</CardTitle>
+              <CardDescription>
+                Your Google access token has expired or needs to be refreshed
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {googleReconnectMessage}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Click the button below to reconnect your Google account. This will:
+              </p>
+              <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+                <li>Disconnect your existing Google account</li>
+                <li>Redirect you to Google for re-authorization</li>
+                <li>Obtain a new refresh token for future use</li>
+              </ol>
+            </CardContent>
+            <CardFooter>
+              <ReconnectGoogleButton />
+            </CardFooter>
+          </Card>
         ) : githubRepos.length === 0 ? (
           <Card>
             <CardHeader>
@@ -125,17 +170,17 @@ export default async function SyncConfigsPage() {
               </p>
             </CardContent>
           </Card>
-        ) : googleFolders.length === 0 ? (
+        ) : googleDocs.length === 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>No Google Drive Folders Found</CardTitle>
+              <CardTitle>No Google Docs Found</CardTitle>
               <CardDescription>
-                Make sure your Google account has access to folders
+                Make sure your Google account has access to documents
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                We couldn't find any folders in your Google Drive.
+                We couldn't find any Google Docs in your account.
                 Please check your Google Drive permissions and try again.
               </p>
             </CardContent>
@@ -144,7 +189,7 @@ export default async function SyncConfigsPage() {
           <>
             <SyncConfigForm
               githubRepos={githubRepos}
-              googleFolders={googleFolders}
+              googleDocs={googleDocs}
             />
 
             {configs.length > 0 && (
@@ -172,6 +217,47 @@ export default async function SyncConfigsPage() {
                           {config.syncSchedule}
                         </span>
                       </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {trackedDocs.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tracked Documents</CardTitle>
+                  <CardDescription>
+                    Documents ready to sync to GitHub
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {trackedDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between rounded-lg border p-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{doc.title || "Untitled"}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          {doc.lastSynced && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(doc.lastSynced).toLocaleDateString()}
+                            </span>
+                          )}
+                          {doc.metadata?.commitSha && (
+                            <span className="flex items-center gap-1">
+                              <GitCommit className="h-3 w-3" />
+                              {String(doc.metadata.commitSha).slice(0, 7)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <SyncButton docId={doc.googleDocId!} docName={doc.title!} />
                     </div>
                   ))}
                 </CardContent>

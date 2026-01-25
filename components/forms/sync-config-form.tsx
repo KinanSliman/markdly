@@ -19,11 +19,11 @@ import { NEXTJS_TEMPLATE, HUGO_TEMPLATE, DOCUSAURUS_TEMPLATE, ASTRO_TEMPLATE } f
 
 interface SyncConfigFormProps {
   githubRepos: Array<{ owner: string; name: string }>;
-  googleFolders: Array<{ id: string; name: string }>;
+  googleDocs: Array<{ id: string; name: string }>;
   onSuccess?: () => void;
 }
 
-export function SyncConfigForm({ githubRepos, googleFolders, onSuccess }: SyncConfigFormProps) {
+export function SyncConfigForm({ githubRepos, googleDocs, onSuccess }: SyncConfigFormProps) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -31,7 +31,7 @@ export function SyncConfigForm({ githubRepos, googleFolders, onSuccess }: SyncCo
   const [formData, setFormData] = useState({
     name: "",
     githubRepo: "",
-    googleFolder: "",
+    googleDoc: "",
     framework: "nextjs",
     outputPath: "content/posts/",
     imageStrategy: "cloudinary",
@@ -68,8 +68,8 @@ export function SyncConfigForm({ githubRepos, googleFolders, onSuccess }: SyncCo
       // Parse GitHub repo
       const [repoOwner, repoName] = formData.githubRepo.split("/");
 
-      // Parse Google folder
-      const [folderId, folderName] = formData.googleFolder.split(":");
+      // Parse Google Doc
+      const [docId, docName] = formData.googleDoc.split(":");
 
       const response = await fetch("/api/sync-config", {
         method: "POST",
@@ -78,8 +78,8 @@ export function SyncConfigForm({ githubRepos, googleFolders, onSuccess }: SyncCo
           name: formData.name,
           repoOwner,
           repoName,
-          folderId,
-          folderName,
+          docId,
+          docName,
           framework: formData.framework,
           outputPath: formData.outputPath,
           imageStrategy: formData.imageStrategy,
@@ -158,20 +158,20 @@ export function SyncConfigForm({ githubRepos, googleFolders, onSuccess }: SyncCo
             </Select>
           </div>
 
-          {/* Google Drive Folder */}
+          {/* Google Drive Document */}
           <div className="space-y-2">
-            <Label htmlFor="googleFolder">Google Drive Folder</Label>
+            <Label htmlFor="googleDoc">Google Drive Document</Label>
             <Select
-              value={formData.googleFolder}
-              onValueChange={(value: string) => setFormData({ ...formData, googleFolder: value })}
+              value={formData.googleDoc}
+              onValueChange={(value: string) => setFormData({ ...formData, googleDoc: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a folder" />
+                <SelectValue placeholder="Select a document" />
               </SelectTrigger>
               <SelectContent>
-                {googleFolders.map((folder) => (
-                  <SelectItem key={folder.id} value={`${folder.id}:${folder.name}`}>
-                    {folder.name}
+                {googleDocs.map((doc) => (
+                  <SelectItem key={doc.id} value={`${doc.id}:${doc.name}`}>
+                    {doc.name}
                   </SelectItem>
                 ))}
               </SelectContent>

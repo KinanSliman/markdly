@@ -158,11 +158,19 @@ export async function createBranch({
   });
 
   try {
+    // First, try to get the default branch from the repository
+    const { data: repoData } = await octokit.repos.get({
+      owner,
+      repo,
+    });
+
+    const defaultBranch = repoData.default_branch || "main";
+
     // Get the current commit SHA of the default branch
     const { data: refData } = await octokit.git.getRef({
       owner,
       repo,
-      ref: "heads/main",
+      ref: `heads/${defaultBranch}`,
     });
 
     // Create a new branch
@@ -172,9 +180,10 @@ export async function createBranch({
       ref: `refs/heads/${branchName}`,
       sha: refData.object.sha,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating branch:", error);
-    throw new Error("Failed to create branch");
+    const errorMsg = error?.message || error?.response?.data?.message || "Unknown error";
+    throw new Error(`Failed to create branch: ${errorMsg}`);
   }
 }
 
@@ -208,6 +217,17 @@ export async function createGitHubWorkflow({
   body: string;
   accessToken: string;
 }): Promise<{ prNumber: number; prUrl: string; commitSha: string }> {
+  const octokit = new Octokit({
+    auth: accessToken,
+  });
+
+  // Get the default branch from the repository
+  const { data: repoData } = await octokit.repos.get({
+    owner,
+    repo,
+  });
+
+  const defaultBranch = repoData.default_branch || "main";
   const branchName = generateBranchName();
 
   // Create branch
@@ -234,7 +254,7 @@ export async function createGitHubWorkflow({
     owner,
     repo,
     head: branchName,
-    base: "main",
+    base: defaultBranch,
     title,
     body,
     accessToken,

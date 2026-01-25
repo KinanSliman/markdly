@@ -12,7 +12,7 @@ import {
 import { generateFrontMatter, wrapWithFrontMatter, getTemplateByFramework, extractVariablesFromContent } from "@/lib/markdown/frontmatter";
 import { extractImageUrls, processImagesInMarkdown } from "@/lib/cloudinary";
 import { createGitHubWorkflow } from "@/lib/github";
-import { getGoogleDoc } from "@/lib/google";
+import { getGoogleDoc, refreshGoogleAccessToken } from "@/lib/google";
 
 export interface SyncResult {
   success: boolean;
@@ -83,10 +83,45 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
 
     // 5. Fetch Google Doc and convert to Markdown
     // Use refresh token if available, otherwise use access token
-    const googleToken = googleConn.refreshToken || googleConn.accessToken!;
-    const isAccessToken = !googleConn.refreshToken;
-    const googleDoc = await getGoogleDoc(docId, googleToken, !isAccessToken);
-    const converted = await convertGoogleDocToMarkdown(docId, googleToken, !isAccessToken);
+    let googleToken = googleConn.refreshToken || googleConn.accessToken!;
+    let isAccessToken = !googleConn.refreshToken;
+    let googleDoc;
+    let converted;
+
+    try {
+      googleDoc = await getGoogleDoc(docId, googleToken, !isAccessToken);
+      converted = await convertGoogleDocToMarkdown(docId, googleToken, !isAccessToken);
+    } catch (error) {
+      // If the error is "Invalid Credentials", try refreshing the access token
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("Invalid Credentials") || errorMessage.includes("invalid_grant")) {
+        console.log("Google access token expired, refreshing...");
+
+        if (googleConn.refreshToken) {
+          try {
+            const { access_token } = await refreshGoogleAccessToken(googleConn.refreshToken);
+
+            // Update the Google connection with the new access token
+            await db
+              .update(googleConnections)
+              .set({ accessToken: access_token })
+              .where(eq(googleConnections.id, googleConn.id));
+
+            // Retry with the new access token
+            googleToken = access_token;
+            isAccessToken = true;
+            googleDoc = await getGoogleDoc(docId, googleToken, true);
+            converted = await convertGoogleDocToMarkdown(docId, googleToken, true);
+          } catch (refreshError) {
+            throw new Error(`Failed to refresh Google access token: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
+          }
+        } else {
+          throw new Error("Google access token expired and no refresh token available. Please reconnect your Google account.");
+        }
+      } else {
+        throw error;
+      }
+    }
 
     // 6. Process code blocks
     let markdownContent = processCodeBlocks(converted.content);
@@ -186,6 +221,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       .update(syncHistory)
       .set({
         status: "success",
+        docTitle: googleDoc.name,
         commitSha,
         filesChanged: "1",
         completedAt: new Date(),

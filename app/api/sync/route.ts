@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { executeSync } from "@/lib/sync";
 import { db } from "@/lib/database";
-import { syncConfigs, githubConnections, googleConnections } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { syncConfigs, githubConnections, googleConnections, documents, workspaces, accounts } from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,27 +20,76 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { docId, configId } = body;
 
-    if (!docId || !configId) {
+    if (!docId) {
       return NextResponse.json(
-        { error: "Missing required fields: docId and configId are required" },
+        { error: "Missing required field: docId is required" },
         { status: 400 }
       );
     }
 
-    // 3. Validate sync config exists and belongs to user
-    const [syncConfig] = await db
+    // 3. Get user's workspace
+    const [workspace] = await db
       .select()
-      .from(syncConfigs)
-      .where(eq(syncConfigs.id, configId));
+      .from(workspaces)
+      .where(eq(workspaces.ownerId, session.user.id));
 
-    if (!syncConfig) {
+    if (!workspace) {
       return NextResponse.json(
-        { error: "Sync configuration not found" },
+        { error: "Workspace not found" },
         { status: 404 }
       );
     }
 
-    // 4. Check GitHub connection
+    // 4. Find sync config for this document
+    let syncConfig;
+    if (configId) {
+      // If configId is provided, use it directly
+      [syncConfig] = await db
+        .select()
+        .from(syncConfigs)
+        .where(eq(syncConfigs.id, configId));
+    } else {
+      // Find sync config by looking up the document's syncConfigId
+      const [trackedDoc] = await db
+        .select()
+        .from(documents)
+        .where(and(
+          eq(documents.googleDocId, docId),
+          eq(documents.syncConfigId, workspace.id) // This won't work, need to join
+        ));
+
+      // Get all sync configs for this workspace
+      const workspaceConfigs = await db
+        .select()
+        .from(syncConfigs)
+        .where(eq(syncConfigs.workspaceId, workspace.id));
+
+      // Find the config that has this document
+      const configIds = workspaceConfigs.map(c => c.id).filter((id): id is string => id !== undefined);
+
+      if (configIds.length > 0) {
+        const [docWithConfig] = await db
+          .select()
+          .from(documents)
+          .where(and(
+            eq(documents.googleDocId, docId),
+            inArray(documents.syncConfigId, configIds)
+          ));
+
+        if (docWithConfig) {
+          syncConfig = workspaceConfigs.find(c => c.id === docWithConfig.syncConfigId);
+        }
+      }
+    }
+
+    if (!syncConfig) {
+      return NextResponse.json(
+        { error: "Sync configuration not found for this document" },
+        { status: 404 }
+      );
+    }
+
+    // 5. Check GitHub connection
     const [githubConn] = await db
       .select()
       .from(githubConnections)
@@ -53,25 +102,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Check Google connection
+    // 6. Check Google connection and refresh access token if needed
     const [googleConn] = await db
       .select()
       .from(googleConnections)
       .where(eq(googleConnections.id, syncConfig.googleConnectionId!));
 
-    if (!googleConn || !googleConn.refreshToken) {
+    if (!googleConn || (!googleConn.refreshToken && !googleConn.accessToken)) {
       return NextResponse.json(
         { error: "Google connection not configured. Please connect your Google account." },
         { status: 400 }
       );
     }
 
-    // 6. Execute sync in background (return immediately, let sync run)
+    // Get fresh access token from accounts table (Google OAuth)
+    const [googleAccount] = await db
+      .select({ access_token: accounts.access_token })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.userId, session.user.id),
+          eq(accounts.provider, "google")
+        )
+      );
+
+    // Update Google connection with fresh access token if available
+    if (googleAccount?.access_token) {
+      await db
+        .update(googleConnections)
+        .set({ accessToken: googleAccount.access_token })
+        .where(eq(googleConnections.id, googleConn.id));
+    }
+
+    // 7. Execute sync in background (return immediately, let sync run)
     // Note: For production, this should use a queue system (BullMQ/Upstash Redis)
     // For MVP, we'll run it synchronously
     const result = await executeSync({
       docId,
-      configId,
+      configId: syncConfig.id!,
       userId: session.user.id,
     });
 
@@ -131,9 +199,9 @@ export async function GET(request: NextRequest) {
     // 3. Fetch sync history
     const history = await db
       .select()
-      .from(syncConfigs)
-      .where(eq(syncConfigs.id, configId))
-      .innerJoin(syncConfigs, eq(syncConfigs.id, configId));
+      .from(syncHistory)
+      .where(eq(syncHistory.syncConfigId, configId))
+      .orderBy(syncHistory.startedAt);
 
     return NextResponse.json(
       {

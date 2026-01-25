@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/database";
-import { syncConfigs, githubConnections, googleConnections, workspaces, accounts } from "@/db/schema";
+import { syncConfigs, githubConnections, googleConnections, workspaces, accounts, documents } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
       name,
       repoOwner,
       repoName,
-      folderId,
+      docId,
+      docName,
       framework,
       outputPath,
       imageStrategy,
@@ -31,9 +32,9 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // 3. Validate required fields
-    if (!name || !repoOwner || !repoName || !folderId) {
+    if (!name || !repoOwner || !repoName || !docId) {
       return NextResponse.json(
-        { error: "Missing required fields: name, repoOwner, repoName, folderId are required" },
+        { error: "Missing required fields: name, repoOwner, repoName, docId are required" },
         { status: 400 }
       );
     }
@@ -124,16 +125,34 @@ export async function POST(request: NextRequest) {
       .where(eq(googleConnections.workspaceId, workspace.id));
 
     if (!googleConn) {
+      // Create new Google connection
       const [newGoogleConn] = await db
         .insert(googleConnections)
         .values({
           workspaceId: workspace.id,
-          folderId,
+          folderId: "root", // Default to root since we're selecting individual docs
           accessToken: googleAccount.access_token,
           refreshToken: googleAccount.refresh_token || null,
         })
         .returning();
       googleConn = newGoogleConn;
+    } else {
+      // Update existing Google connection with fresh tokens from accounts table
+      // This handles the case where access token has expired
+      await db
+        .update(googleConnections)
+        .set({
+          accessToken: googleAccount.access_token,
+          // Only update refresh token if we have a new one (Google only returns it on first auth)
+          ...(googleAccount.refresh_token ? { refreshToken: googleAccount.refresh_token } : {}),
+        })
+        .where(eq(googleConnections.id, googleConn.id));
+
+      // Refresh the googleConn variable with updated data
+      [googleConn] = await db
+        .select()
+        .from(googleConnections)
+        .where(eq(googleConnections.id, googleConn.id));
     }
 
     // 7. Create sync configuration
@@ -151,6 +170,18 @@ export async function POST(request: NextRequest) {
         imagePath: "public/images/",
         isActive: true,
         syncSchedule: syncSchedule || "manual",
+      })
+      .returning();
+
+    // 8. Create a tracked document entry for the selected Google Doc
+    // This allows the document picker to show this document for syncing
+    await db
+      .insert(documents)
+      .values({
+        syncConfigId: syncConfig.id,
+        googleDocId: docId,
+        title: docName,
+        createdAt: new Date(),
       })
       .returning();
 

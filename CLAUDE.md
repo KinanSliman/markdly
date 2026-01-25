@@ -96,6 +96,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **OAuthAccountNotLinked**: Fixed by adding test users in Google OAuth consent screen
 - **expires_at type mismatch**: Changed from `timestamp()` to `integer()` in schema (NextAuth stores Unix timestamps)
 - **Missing workspace auto-creation**: Added workspace creation in auth callback and page fallbacks
+- **Google Drive folder visibility**: Changed flow from folder selection to direct document selection to show all accessible files
+- **Expired Google OAuth tokens**: Added automatic token refresh and reconnection flow with `GoogleReconnectRequiredError`
 
 ## Competitive Advantage Features
 
@@ -213,7 +215,12 @@ Tables, comments, images, code blocks, headings — this is where products die.
    - Manual sync trigger
    - Sync status and history
 
-6. **Front Matter Templates** (1 day)
+6. **Document Selection** ✅ **COMPLETE**
+   - List all accessible Google Docs (not just folder contents)
+   - Direct document selection during sync config creation
+   - Tracked documents with one-click sync
+
+7. **Front Matter Templates** (1 day)
    - YAML template editor
    - Variable support ({{title}}, {{date}}, etc.)
 
@@ -281,24 +288,28 @@ Tables, comments, images, code blocks, headings — this is where products die.
    - Bulk import from GitHub
    - Legacy doc migration
 
-## ✅ Current Status: Phase 1 MVP - Google Docs → Markdown Conversion Complete
+## ✅ Current Status: Phase 1 MVP - Complete with Token Refresh & Delete Functionality
 
 ### What's Working Now
 1. **✅ GitHub OAuth** - Connected and working
-2. **✅ Google OAuth** - Connected and working
+2. **✅ Google OAuth** - Connected and working (with `drive.file` scope for better file access)
 3. **✅ Database Schema** - All tables created with correct types
 4. **✅ Dashboard UI** - Shows connection status and sync history
 5. **✅ Settings Page** - Connection buttons for both providers
 6. **✅ Protected Routes** - Auth required for dashboard/settings
 7. **✅ Core Libraries** - Google Docs, GitHub, Cloudinary, Markdown converter, Front matter
 8. **✅ Sync Execution Logic** - Complete workflow implementation
-9. **✅ Sync API Endpoint** - POST /api/sync for triggering syncs
-10. **✅ Sync Config Form** - UI for creating sync configurations
-11. **✅ Document Picker** - List and sync Google Docs
-12. **✅ Sync History Display** - Shows recent sync operations
-13. **✅ Tracked Documents** - Shows synced documents with metadata
+9. **✅ Sync API Endpoint** - POST /api/sync for triggering syncs (with config auto-detection)
+10. **✅ Sync Config Form** - UI for creating sync configurations with document selection
+11. **✅ Document Selection** - Direct Google Doc selection (no folder limitation)
+12. **✅ Sync History Display** - Shows recent sync operations with delete button
+13. **✅ Tracked Documents** - Shows synced documents with metadata and one-click sync
 14. **✅ TypeScript Issues Fixed** - All type errors resolved with proper typing
 15. **✅ Google Docs → Markdown Converter** - Robust conversion with tables, code blocks, headings, images
+16. **✅ Document Discovery** - Lists all accessible Google Docs (including shared files)
+17. **✅ Google OAuth Token Refresh** - Automatic token refresh and reconnection flow for expired tokens
+18. **✅ Sync History Delete** - Delete button with confirmation dialog for each sync entry
+19. **✅ Sync History Display** - Shows doc title, status, commit SHA, file count, timestamp
 
 ### Google Docs → Markdown Converter Features (NEW)
 **The hardest part of the MVP is now complete!**
@@ -353,6 +364,39 @@ Tables, comments, images, code blocks, headings — this is where products die.
 - `test-converter.ts` - Comprehensive test suite for converter
 - `convert-doc.ts` - Utility for converting Word docs to Google Docs format
 
+### Document Selection & Discovery (NEW)
+**Flow Change**: From folder-based selection to direct document selection
+
+**Updated Files:**
+- `lib/google/index.ts` - Added functions for listing all accessible docs/folders
+  - `listAllAccessibleFolders()` - Lists all folders user has access to
+  - `listAllAccessibleDocs()` - Lists all Google Docs across entire Drive
+  - Updated `listFilesInFolder()` to handle root folder specially
+
+- `lib/auth/index.ts` - Added `drive.file` scope for better file access permissions
+
+- `components/forms/sync-config-form.tsx` - Changed from folder selection to document selection
+  - Renamed `googleFolders` prop to `googleDocs`
+  - Changed dropdown from "Google Drive Folder" to "Google Drive Document"
+
+- `components/forms/sync-button.tsx` - Updated to trigger sync directly
+  - Accepts `docId` and `docName` props
+  - Calls `/api/sync` endpoint directly
+
+- `app/settings/sync-configs/page.tsx` - Updated to fetch and display Google Docs
+  - Uses `listAllAccessibleDocs()` instead of folder listing
+  - Added tracked documents section with Sync buttons
+
+- `app/api/sync-config/route.ts` - Updated to accept document selection
+  - Changed from `folderId`/`folderName` to `docId`/`docName`
+  - Creates tracked document entry in `documents` table
+
+- `app/api/sync/route.ts` - Updated to auto-find sync config by document
+  - Can find sync config by document ID if `configId` not provided
+
+- `app/api/auth/disconnect/route.ts` - Fixed error handling for missing records
+  - Added try-catch around delete operations
+
 ### Test Results
 **Converter Test (test-converter.ts)** ✅ PASSED
 
@@ -370,6 +414,27 @@ Successfully converted a real Google Doc with:
 
 **Output:** Clean markdown with proper formatting (prototype quality - ready for refinement)
 
+**Google OAuth Reconnection Flow** ✅ PASSED
+
+Successfully tested the reconnection flow for expired Google OAuth tokens:
+1. User visits sync-configs page with expired token
+2. Page detects `GoogleReconnectRequiredError` and shows reconnection card
+3. User clicks "Reconnect Google" button
+4. Existing Google account is disconnected (with sync cleanup)
+5. User is redirected to Google OAuth with `prompt=consent`
+6. User authorizes and gets new refresh token
+7. User is redirected back to sync-configs page
+8. Google Docs are successfully listed
+
+**Sync History with Delete** ✅ PASSED
+
+Successfully tested sync history display and deletion:
+1. Sync history shows all sync operations for workspace
+2. Each entry displays: doc title, status, commit SHA, file count, timestamp
+3. Delete button with confirmation dialog works correctly
+4. Sync history is properly deleted from database
+5. UI updates immediately after deletion
+
 ### Database Tables (Live)
 ```
 users              ✓ (9 columns)
@@ -419,36 +484,43 @@ audit_logs         ✓ (8 columns)
 
 ### Files Created/Updated in Phase 1
 **Core Sync Logic:**
-- `lib/sync/index.ts` - Main sync execution workflow
-- `app/api/sync/route.ts` - Sync API endpoint
-- `app/api/sync-config/route.ts` - Sync configuration API
+- `lib/sync/index.ts` - Main sync execution workflow (with auto token refresh)
+- `app/api/sync/route.ts` - Sync API endpoint (updated for auto config detection)
+- `app/api/sync-config/route.ts` - Sync configuration API (updated for document selection)
 - `app/api/documents/route.ts` - Documents listing API
+- `app/api/sync-history/[id]/route.ts` - API endpoint for deleting sync history
 
 **UI Components:**
-- `components/forms/sync-config-form.tsx` - Create sync configurations
-- `components/forms/document-picker.tsx` - Pick and sync Google Docs
-- `components/forms/sync-button.tsx` - Updated to link to config page
+- `components/forms/sync-config-form.tsx` - Create sync configurations with document selection
+- `components/forms/document-picker.tsx` - Pick and sync Google Docs (legacy)
+- `components/forms/sync-button.tsx` - Updated to trigger sync directly
 - `components/forms/disconnect-button.tsx` - Disconnect OAuth accounts
+- `components/forms/reconnect-google-button.tsx` - One-click Google reconnection
+- `components/forms/delete-sync-button.tsx` - Delete sync history with confirmation
+- `components/forms/signin-button.tsx` - OAuth sign-in button
+- `components/sync-history-list.tsx` - Client-side sync history list with delete support
 - `components/ui/badge.tsx` - Badge component
 - `components/ui/select.tsx` - Select dropdown component
 - `components/ui/skeleton.tsx` - Skeleton loading component
 - `components/ui/card.tsx` - Added CardFooter component
+- `components/ui/dialog.tsx` - Radix UI Dialog component
 
 **Pages:**
-- `app/settings/sync-configs/page.tsx` - Sync configuration management
+- `app/settings/sync-configs/page.tsx` - Sync configuration management (with reconnection flow)
 - `app/dashboard/page.tsx` - Updated with sync stats, onboarding, workspace auto-creation
-- `app/dashboard/syncs/page.tsx` - Updated with real sync history
+- `app/dashboard/syncs/page.tsx` - Updated with real sync history and delete support
 - `app/dashboard/documents/page.tsx` - Updated with tracked documents
 - `app/settings/page.tsx` - Updated with sync config link and disconnect buttons
 - `components/layout/dashboard-nav.tsx` - Added sync configs nav item
 
 **API Endpoints:**
-- `app/api/auth/disconnect/route.ts` - Disconnect OAuth accounts endpoint
+- `app/api/auth/disconnect/route.ts` - Disconnect OAuth accounts endpoint (with sync cleanup)
+- `app/api/sync-history/[id]/route.ts` - Delete sync history endpoint
 
 **Library Updates:**
-- `lib/auth/index.ts` - Added workspace auto-creation in signIn callback
+- `lib/auth/index.ts` - Added workspace auto-creation, `drive.file` scope, `prompt: "consent"`, `access_type: "offline"`
 - `lib/github/index.ts` - Added `listGitHubRepos()` function
-- `lib/google/index.ts` - Fixed type issues with null/undefined handling
+- `lib/google/index.ts` - Added `listAllAccessibleDocs()`, `listAllAccessibleFolders()`, `getValidGoogleAccessToken()`, `refreshGoogleAccessToken()`, `GoogleReconnectRequiredError`
 - `lib/cloudinary/index.ts` - Installed cloudinary package
 - `lib/markdown/converter.ts` - Ready for conversion
 - `lib/markdown/frontmatter.ts` - Ready for front matter generation
@@ -468,6 +540,12 @@ audit_logs         ✓ (8 columns)
    - `app/dashboard/page.tsx` - Fallback workspace creation
    - `app/settings/page.tsx` - Fallback workspace creation
    - `app/settings/sync-configs/page.tsx` - Fallback workspace creation
+8. **Expired Google OAuth tokens** → Added automatic token refresh and reconnection flow:
+   - `GoogleReconnectRequiredError` - Custom error class for reconnection requirements
+   - `getValidGoogleAccessToken()` - Automatically refreshes expired tokens
+   - `ReconnectGoogleButton` - One-click reconnection UI
+   - Sync execution auto-retries with refreshed token on "Invalid Credentials" error
+   - Disconnect API now properly deletes sync_history before sync_configs
 
 ### TypeScript Issues - FIXED ✅
 All remaining TypeScript issues have been resolved:
@@ -489,6 +567,24 @@ All remaining TypeScript issues have been resolved:
    - **Solution**: Added workspace creation in auth callback and page fallbacks
    - Ensures workspace exists before creating sync configurations
 
+### Document Selection Flow - FIXED ✅
+Changed from folder-based selection to direct document selection:
+
+**Problem**: Google Drive API only showed files without sharing restrictions when using folder-based queries.
+
+**Solution**:
+1. Changed flow to select individual Google Docs directly during sync config creation
+2. Added `listAllAccessibleDocs()` function that searches for all accessible docs across entire Drive
+3. Updated OAuth scopes to include `drive.file` for better file access permissions
+4. Documents are now tracked in the `documents` table when sync config is created
+5. One-click sync from the tracked documents list
+
+**Benefits**:
+- Shows all accessible Google Docs (including shared files)
+- Simpler user flow (no folder navigation needed)
+- Direct sync from tracked documents list
+- Better handling of complex sharing permissions
+
 ### Next Steps (Phase 2 - Polish & Reliability)
 1. **Error Handling & Retries** - Add retry logic for transient errors
 2. **Multi-Framework Support** - Template system for different SSGs
@@ -496,6 +592,7 @@ All remaining TypeScript issues have been resolved:
 4. **Prettier Integration** - Auto-format with repo's Prettier config
 5. **Change Detection** - Show diff of what changed since last sync
 6. **Testing** - Unit tests for markdown conversion, integration tests for sync flow
+7. **Image Handling** - Cloudinary integration for image upload and CDN URLs
 
 ### Known Issue - Database Clearing
 **Issue**: When database is cleared (all records deleted), old JWT tokens still reference non-existent user IDs, causing foreign key constraint errors.
@@ -509,20 +606,42 @@ All remaining TypeScript issues have been resolved:
 
 ### Sync Flow (Complete)
 ```
-1. User creates sync configuration (GitHub repo + Google Drive folder + framework)
-2. User selects document from Google Drive folder
-3. User clicks "Sync" → POST /api/sync
-4. Execute sync workflow:
+1. User creates sync configuration (GitHub repo + Google Doc + framework)
+   - Selects a Google Doc directly (no folder limitation)
+   - Document is automatically tracked in documents table
+2. User clicks "Sync" → POST /api/sync
+3. Execute sync workflow:
    a. Fetch Google Doc via API
+      - If "Invalid Credentials" error, automatically refresh access token
+      - Retry with new token
    b. Convert to Markdown (tables, headings, code blocks)
    c. Process images (extract, upload to Cloudinary, update links)
    d. Generate front matter from template
    e. Create GitHub branch
    f. Commit file to repo
    g. Create Pull Request
-   h. Log to sync_history table
+   h. Log to sync_history table with docTitle
    i. Update documents table with tracking info
-5. Return PR URL to user
+4. Return PR URL to user
+```
+
+### Google OAuth Token Refresh Flow
+```
+1. User visits sync-configs page with expired token
+2. Page calls listAllAccessibleDocsByUserId(userId)
+3. getValidGoogleAccessToken() checks if token is expired
+4. If expired and no refresh token:
+   - Throws GoogleReconnectRequiredError
+   - Page shows "Reconnection Required" card
+5. User clicks "Reconnect Google" button
+6. Button:
+   - Disconnects existing Google account via /api/auth/disconnect
+   - Deletes sync_history, documents, and sync_configs
+   - Redirects to Google OAuth with prompt=consent
+7. User authorizes with Google
+8. Google returns new access_token and refresh_token
+9. User is redirected back to /settings/sync-configs
+10. Page can now list Google Docs successfully
 ```
 
 ### Environment Variables Needed
@@ -549,14 +668,15 @@ CLOUDINARY_API_SECRET=your_api_secret
 2. Connect Google account (Settings → Google Connection)
 3. Go to Settings → Sync Configurations
 4. Create a new sync configuration:
+   - Enter a configuration name
    - Select a GitHub repo
-   - Select a Google Drive folder
+   - **Select a Google Drive document** (shows all accessible docs)
    - Choose framework (Next.js, Hugo, etc.)
    - Set output path (e.g., `content/posts/`)
    - Use default front matter template
    - Select Cloudinary as image strategy
-5. Go to the document picker (click "Manage Configurations")
-6. Select a Google Doc and click "Sync"
+5. The document appears in "Tracked Documents" section
+6. Click "Sync" button next to the document
 7. Check the PR on GitHub and sync history on dashboard
 
 ### What's NOT in v1 (Cut for MVP)
