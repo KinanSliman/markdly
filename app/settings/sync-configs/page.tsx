@@ -3,7 +3,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/database";
-import { syncConfigs, workspaces, githubConnections, googleConnections } from "@/db/schema";
+import { syncConfigs, workspaces, accounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { SyncConfigForm } from "@/components/forms/sync-config-form";
 import { listGitHubRepos } from "@/lib/github";
@@ -17,33 +17,40 @@ export default async function SyncConfigsPage() {
   }
 
   // Get user's workspace
-  const [workspace] = await db
+  let [workspace] = await db
     .select()
     .from(workspaces)
     .where(eq(workspaces.ownerId, session.user.id!));
 
+  // Create workspace if it doesn't exist
   if (!workspace) {
-    redirect("/settings");
+    const newWorkspace = await db
+      .insert(workspaces)
+      .values({
+        ownerId: session.user.id!,
+        name: `${session.user.name || session.user.email}'s Workspace`,
+        plan: "free",
+      })
+      .returning();
+
+    workspace = newWorkspace[0];
   }
 
-  // Get GitHub connection
-  const [githubConn] = await db
-    .select()
-    .from(githubConnections)
-    .where(eq(githubConnections.workspaceId, workspace.id!));
+  // Check OAuth connections via accounts table (not workspace-specific tables)
+  const userAccounts = await db
+    .select({ provider: accounts.provider, accessToken: accounts.access_token, refreshToken: accounts.refresh_token })
+    .from(accounts)
+    .where(eq(accounts.userId, session.user.id!));
 
-  // Get Google connection
-  const [googleConn] = await db
-    .select()
-    .from(googleConnections)
-    .where(eq(googleConnections.workspaceId, workspace.id!));
+  const githubAccount = userAccounts.find((a) => a.provider === "github");
+  const googleAccount = userAccounts.find((a) => a.provider === "google");
 
   let githubRepos: Array<{ owner: string; name: string }> = [];
   let googleFolders: Array<{ id: string; name: string }> = [];
 
-  if (githubConn?.accessToken) {
+  if (githubAccount?.accessToken) {
     try {
-      const repos = await listGitHubRepos(githubConn.accessToken);
+      const repos = await listGitHubRepos(githubAccount.accessToken);
       githubRepos = repos.map((repo) => ({
         owner: repo.owner.login,
         name: repo.name,
@@ -53,18 +60,24 @@ export default async function SyncConfigsPage() {
     }
   }
 
-  if (googleConn?.refreshToken) {
+  if (googleAccount?.accessToken) {
     try {
-      const folders = await listFilesInFolder("root", googleConn.refreshToken);
+      console.log("Attempting to list Google Drive folders using access token...");
+      // Use access token directly since refresh token might not be available
+      const folders = await listFilesInFolder("root", googleAccount.accessToken, true);
+      console.log("Google Drive folders:", folders);
       googleFolders = folders
         .filter((f) => f.mimeType === "application/vnd.google-apps.folder")
         .map((f) => ({
           id: f.id,
           name: f.name,
         }));
+      console.log("Filtered Google Drive folders:", googleFolders);
     } catch (error) {
       console.error("Error fetching Google folders:", error);
     }
+  } else {
+    console.log("No Google access token found. accessToken:", googleAccount?.accessToken);
   }
 
   // Get existing sync configs
@@ -83,7 +96,7 @@ export default async function SyncConfigsPage() {
           </p>
         </div>
 
-        {!githubConn || !googleConn ? (
+        {!githubAccount || !googleAccount ? (
           <Card>
             <CardHeader>
               <CardTitle>Connections Required</CardTitle>

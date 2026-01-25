@@ -86,11 +86,16 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - Dashboard shows real-time connection status (green checkmark / red X)
 - "Connect Google" button appears when Google isn't linked
 - Settings page has buttons for both GitHub and Google connections
+- **Disconnect buttons** - Added to Settings page for both GitHub and Google
+  - Shows "✓ Connected" with "Disconnect" button when connected
+  - Confirmation dialog before disconnecting
+  - Deletes OAuth account and provider-specific connections
 
 ### 6. **Critical Bug Fixes** ✅
 - **OAuth redirect_uri_mismatch**: Fixed by adding correct callback URLs to Google Cloud Console
 - **OAuthAccountNotLinked**: Fixed by adding test users in Google OAuth consent screen
 - **expires_at type mismatch**: Changed from `timestamp()` to `integer()` in schema (NextAuth stores Unix timestamps)
+- **Missing workspace auto-creation**: Added workspace creation in auth callback and page fallbacks
 
 ## Competitive Advantage Features
 
@@ -423,6 +428,7 @@ audit_logs         ✓ (8 columns)
 - `components/forms/sync-config-form.tsx` - Create sync configurations
 - `components/forms/document-picker.tsx` - Pick and sync Google Docs
 - `components/forms/sync-button.tsx` - Updated to link to config page
+- `components/forms/disconnect-button.tsx` - Disconnect OAuth accounts
 - `components/ui/badge.tsx` - Badge component
 - `components/ui/select.tsx` - Select dropdown component
 - `components/ui/skeleton.tsx` - Skeleton loading component
@@ -430,13 +436,17 @@ audit_logs         ✓ (8 columns)
 
 **Pages:**
 - `app/settings/sync-configs/page.tsx` - Sync configuration management
-- `app/dashboard/page.tsx` - Updated with sync stats and onboarding
+- `app/dashboard/page.tsx` - Updated with sync stats, onboarding, workspace auto-creation
 - `app/dashboard/syncs/page.tsx` - Updated with real sync history
 - `app/dashboard/documents/page.tsx` - Updated with tracked documents
-- `app/settings/page.tsx` - Updated with sync config link
+- `app/settings/page.tsx` - Updated with sync config link and disconnect buttons
 - `components/layout/dashboard-nav.tsx` - Added sync configs nav item
 
+**API Endpoints:**
+- `app/api/auth/disconnect/route.ts` - Disconnect OAuth accounts endpoint
+
 **Library Updates:**
+- `lib/auth/index.ts` - Added workspace auto-creation in signIn callback
 - `lib/github/index.ts` - Added `listGitHubRepos()` function
 - `lib/google/index.ts` - Fixed type issues with null/undefined handling
 - `lib/cloudinary/index.ts` - Installed cloudinary package
@@ -453,6 +463,11 @@ audit_logs         ✓ (8 columns)
    - Adding `DocumentMetadata` interface and using `.$type<DocumentMetadata>()` for JSON columns
    - Updating toast hook to accept `React.ReactNode` for description
    - Using optional chaining for cleaner metadata access
+7. **Missing workspace auto-creation** → Added workspace creation in:
+   - `lib/auth/index.ts` - signIn callback creates workspace for new users
+   - `app/dashboard/page.tsx` - Fallback workspace creation
+   - `app/settings/page.tsx` - Fallback workspace creation
+   - `app/settings/sync-configs/page.tsx` - Fallback workspace creation
 
 ### TypeScript Issues - FIXED ✅
 All remaining TypeScript issues have been resolved:
@@ -470,6 +485,10 @@ All remaining TypeScript issues have been resolved:
    - **Solution**: Sessions table already had correct schema with `sessionToken` as primary key
    - Matches Drizzle adapter's expected schema
 
+4. **Workspace auto-creation** - Fixed foreign key constraint errors
+   - **Solution**: Added workspace creation in auth callback and page fallbacks
+   - Ensures workspace exists before creating sync configurations
+
 ### Next Steps (Phase 2 - Polish & Reliability)
 1. **Error Handling & Retries** - Add retry logic for transient errors
 2. **Multi-Framework Support** - Template system for different SSGs
@@ -477,6 +496,16 @@ All remaining TypeScript issues have been resolved:
 4. **Prettier Integration** - Auto-format with repo's Prettier config
 5. **Change Detection** - Show diff of what changed since last sync
 6. **Testing** - Unit tests for markdown conversion, integration tests for sync flow
+
+### Known Issue - Database Clearing
+**Issue**: When database is cleared (all records deleted), old JWT tokens still reference non-existent user IDs, causing foreign key constraint errors.
+
+**Solution**: Sign out and sign back in to create a new user:
+1. Visit `http://localhost:3000/api/auth/signout`
+2. Go to homepage and sign in again
+3. New user and workspace will be created automatically
+
+**Root Cause**: The workspace auto-creation logic tries to create a workspace for a user ID that doesn't exist in the database (from old JWT token). The foreign key constraint `workspaces_owner_id_users_id_fk` fails because the user doesn't exist.
 
 ### Sync Flow (Complete)
 ```

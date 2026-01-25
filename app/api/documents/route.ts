@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       .from(googleConnections)
       .where(eq(googleConnections.id, syncConfig.googleConnectionId!));
 
-    if (!googleConn || !googleConn.refreshToken) {
+    if (!googleConn || (!googleConn.refreshToken && !googleConn.accessToken)) {
       return NextResponse.json(
         { error: "Google connection not found or not authorized" },
         { status: 400 }
@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
 
     // 5. List Google Docs from the configured folder
     const folderId = googleConn.folderId;
-    const files = await listFilesInFolder(folderId!, googleConn.refreshToken);
+    const googleToken = googleConn.refreshToken || googleConn.accessToken!;
+    const isAccessToken = !googleConn.refreshToken;
+    const files = await listFilesInFolder(folderId!, googleToken, !isAccessToken);
 
     // 6. Filter only Google Docs
     const googleDocs = files.filter(

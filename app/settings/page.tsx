@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { auth } from "@/lib/auth";
 import { Separator } from "@/components/ui/separator";
 import { SignInButton } from "@/components/forms/signin-button";
+import { DisconnectButton } from "@/components/forms/disconnect-button";
 import { Button } from "@/components/ui/button";
 import { Settings, ExternalLink } from "lucide-react";
 import { db } from "@/lib/database";
@@ -29,10 +30,24 @@ export default async function SettingsPage() {
   const googleConnected = connectedProviders.has("google");
 
   // Get workspace and sync configs
-  const [workspace] = await db
+  let [workspace] = await db
     .select()
     .from(workspaces)
     .where(eq(workspaces.ownerId, session.user.id!));
+
+  // Create workspace if it doesn't exist
+  if (!workspace) {
+    const newWorkspace = await db
+      .insert(workspaces)
+      .values({
+        ownerId: session.user.id!,
+        name: `${session.user.name || session.user.email}'s Workspace`,
+        plan: "free",
+      })
+      .returning();
+
+    workspace = newWorkspace[0];
+  }
 
   let configsCount = 0;
   if (workspace) {
@@ -68,8 +83,9 @@ export default async function SettingsPage() {
                 Connect a GitHub account to enable syncing documents to your repositories.
               </p>
               {githubConnected ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between">
                   <span className="text-green-600 font-medium">✓ Connected</span>
+                  <DisconnectButton provider="github" />
                 </div>
               ) : (
                 <SignInButton provider="github" label="Connect GitHub" />
@@ -89,8 +105,9 @@ export default async function SettingsPage() {
                 Connect a Google account to access your Google Docs for syncing.
               </p>
               {googleConnected ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between">
                   <span className="text-green-600 font-medium">✓ Connected</span>
+                  <DisconnectButton provider="google" />
                 </div>
               ) : (
                 <SignInButton provider="google" label="Connect Google" />

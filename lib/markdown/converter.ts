@@ -74,14 +74,24 @@ export interface GoogleDocContent {
 
 /**
  * Fetches a Google Doc and converts it to Markdown
+ * Accepts either an access token or refresh token
  */
 export async function convertGoogleDocToMarkdown(
   docId: string,
-  accessToken: string
+  token: string,
+  isAccessToken = true
 ): Promise<GoogleDocContent> {
-  // Create an OAuth2Client with the access token
-  const oauth2Client = new OAuth2Client();
-  oauth2Client.setCredentials({ access_token: accessToken });
+  // Create an OAuth2Client
+  const oauth2Client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+
+  if (isAccessToken) {
+    oauth2Client.setCredentials({ access_token: token });
+  } else {
+    oauth2Client.setCredentials({ refresh_token: token });
+  }
 
   const docs = google.docs({ version: "v1", auth: oauth2Client });
 

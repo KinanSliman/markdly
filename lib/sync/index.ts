@@ -77,13 +77,16 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       .from(googleConnections)
       .where(eq(googleConnections.id, syncConfig.googleConnectionId!));
 
-    if (!googleConn || !googleConn.refreshToken) {
+    if (!googleConn || (!googleConn.refreshToken && !googleConn.accessToken)) {
       throw new Error("Google connection not found or not authorized");
     }
 
     // 5. Fetch Google Doc and convert to Markdown
-    const googleDoc = await getGoogleDoc(docId, googleConn.refreshToken);
-    const converted = await convertGoogleDocToMarkdown(docId, googleConn.refreshToken);
+    // Use refresh token if available, otherwise use access token
+    const googleToken = googleConn.refreshToken || googleConn.accessToken!;
+    const isAccessToken = !googleConn.refreshToken;
+    const googleDoc = await getGoogleDoc(docId, googleToken, !isAccessToken);
+    const converted = await convertGoogleDocToMarkdown(docId, googleToken, !isAccessToken);
 
     // 6. Process code blocks
     let markdownContent = processCodeBlocks(converted.content);

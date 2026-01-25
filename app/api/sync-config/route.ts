@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/database";
-import { syncConfigs, githubConnections, googleConnections, workspaces } from "@/db/schema";
+import { syncConfigs, githubConnections, googleConnections, workspaces, accounts } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
@@ -56,8 +56,26 @@ export async function POST(request: NextRequest) {
       workspace = newWorkspace;
     }
 
-    // 5. Get GitHub connection for this workspace
-    const [githubConn] = await db
+    // 5. Get GitHub access token from OAuth accounts
+    const [githubAccount] = await db
+      .select({ access_token: accounts.access_token })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.userId, session.user.id),
+          eq(accounts.provider, "github")
+        )
+      );
+
+    if (!githubAccount?.access_token) {
+      return NextResponse.json(
+        { error: "GitHub account not connected. Please connect GitHub first." },
+        { status: 400 }
+      );
+    }
+
+    // 6. Get or create GitHub connection for this workspace
+    let [githubConn] = await db
       .select()
       .from(githubConnections)
       .where(
@@ -69,23 +87,53 @@ export async function POST(request: NextRequest) {
       );
 
     if (!githubConn) {
+      const [newGithubConn] = await db
+        .insert(githubConnections)
+        .values({
+          workspaceId: workspace.id,
+          repoOwner,
+          repoName,
+          accessToken: githubAccount.access_token,
+        })
+        .returning();
+      githubConn = newGithubConn;
+    }
+
+    // 7. Get Google access token from OAuth accounts
+    const [googleAccount] = await db
+      .select({ access_token: accounts.access_token, refresh_token: accounts.refresh_token })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.userId, session.user.id),
+          eq(accounts.provider, "google")
+        )
+      );
+
+    if (!googleAccount?.access_token) {
       return NextResponse.json(
-        { error: "GitHub connection not found for this repository. Please connect GitHub first." },
+        { error: "Google account not connected. Please connect Google first." },
         { status: 400 }
       );
     }
 
-    // 6. Get Google connection for this workspace
-    const [googleConn] = await db
+    // 8. Get or create Google connection for this workspace
+    let [googleConn] = await db
       .select()
       .from(googleConnections)
       .where(eq(googleConnections.workspaceId, workspace.id));
 
     if (!googleConn) {
-      return NextResponse.json(
-        { error: "Google connection not found. Please connect Google first." },
-        { status: 400 }
-      );
+      const [newGoogleConn] = await db
+        .insert(googleConnections)
+        .values({
+          workspaceId: workspace.id,
+          folderId,
+          accessToken: googleAccount.access_token,
+          refreshToken: googleAccount.refresh_token || null,
+        })
+        .returning();
+      googleConn = newGoogleConn;
     }
 
     // 7. Create sync configuration

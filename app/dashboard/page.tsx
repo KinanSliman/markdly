@@ -28,10 +28,24 @@ export default async function DashboardPage() {
   const googleConnected = connectedProviders.has("google");
 
   // Get workspace and sync configs
-  const [workspace] = await db
+  let [workspace] = await db
     .select()
     .from(workspaces)
     .where(eq(workspaces.ownerId, session.user.id!));
+
+  // Create workspace if it doesn't exist
+  if (!workspace) {
+    const newWorkspace = await db
+      .insert(workspaces)
+      .values({
+        ownerId: session.user.id!,
+        name: `${session.user.name || session.user.email}'s Workspace`,
+        plan: "free",
+      })
+      .returning();
+
+    workspace = newWorkspace[0];
+  }
 
   let configsCount = 0;
   let recentSyncs: typeof syncHistory.$inferSelect[] = [];

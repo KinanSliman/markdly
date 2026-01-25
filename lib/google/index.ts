@@ -2,9 +2,22 @@ import { google } from "googleapis";
 
 /**
  * Fetches a list of Google Docs from a user's Drive
+ * Accepts either an access token or refresh token
  */
-export async function listGoogleDocs(accessToken: string): Promise<Array<{ id: string; name: string; modifiedTime?: string }>> {
-  const drive = google.drive({ version: "v3", auth: accessToken });
+export async function listGoogleDocs(token: string, isAccessToken = false): Promise<Array<{ id: string; name: string; modifiedTime?: string }>> {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${process.env.NEXTAUTH_URL}/api/auth/callback/google`
+  );
+
+  if (isAccessToken) {
+    oauth2Client.setCredentials({ access_token: token });
+  } else {
+    oauth2Client.setCredentials({ refresh_token: token });
+  }
+
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
 
   try {
     const response = await drive.files.list({
@@ -27,12 +40,26 @@ export async function listGoogleDocs(accessToken: string): Promise<Array<{ id: s
 
 /**
  * Fetches a specific Google Doc by ID
+ * Accepts either an access token or refresh token
  */
 export async function getGoogleDoc(
   docId: string,
-  accessToken: string
+  token: string,
+  isAccessToken = false
 ): Promise<{ id: string; name: string; content?: any }> {
-  const docs = google.docs({ version: "v1", auth: accessToken });
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${process.env.NEXTAUTH_URL}/api/auth/callback/google`
+  );
+
+  if (isAccessToken) {
+    oauth2Client.setCredentials({ access_token: token });
+  } else {
+    oauth2Client.setCredentials({ refresh_token: token });
+  }
+
+  const docs = google.docs({ version: "v1", auth: oauth2Client });
 
   try {
     const response = await docs.documents.get({
@@ -52,12 +79,26 @@ export async function getGoogleDoc(
 
 /**
  * Gets the user's Google Drive folder ID for a specific folder name
+ * Accepts either an access token or refresh token
  */
 export async function getFolderId(
   folderName: string,
-  accessToken: string
+  token: string,
+  isAccessToken = false
 ): Promise<string | null> {
-  const drive = google.drive({ version: "v3", auth: accessToken });
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${process.env.NEXTAUTH_URL}/api/auth/callback/google`
+  );
+
+  if (isAccessToken) {
+    oauth2Client.setCredentials({ access_token: token });
+  } else {
+    oauth2Client.setCredentials({ refresh_token: token });
+  }
+
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
 
   try {
     const response = await drive.files.list({
@@ -75,12 +116,32 @@ export async function getFolderId(
 
 /**
  * Lists files in a specific Google Drive folder
+ * Accepts either an access token or refresh token
  */
 export async function listFilesInFolder(
   folderId: string,
-  accessToken: string
+  token: string,
+  isAccessToken = false
 ): Promise<Array<{ id: string; name: string; mimeType: string }>> {
-  const drive = google.drive({ version: "v3", auth: accessToken });
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    `${process.env.NEXTAUTH_URL}/api/auth/callback/google`
+  );
+
+  if (isAccessToken) {
+    // Use access token directly (short-lived, expires in ~1 hour)
+    oauth2Client.setCredentials({
+      access_token: token,
+    });
+  } else {
+    // Use refresh token to get fresh access tokens
+    oauth2Client.setCredentials({
+      refresh_token: token,
+    });
+  }
+
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
 
   try {
     const response = await drive.files.list({

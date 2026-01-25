@@ -87,6 +87,7 @@ export const googleConnections = pgTable("google_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").references(() => workspaces.id),
   folderId: text("folder_id"),
+  accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
