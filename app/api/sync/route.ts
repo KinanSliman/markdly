@@ -89,17 +89,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Check GitHub connection
-    const [githubConn] = await db
-      .select()
-      .from(githubConnections)
-      .where(eq(githubConnections.id, syncConfig.githubConnectionId!));
+    // 5. Check GitHub connection (only for github mode)
+    if (syncConfig.mode === "github") {
+      const [githubConn] = await db
+        .select()
+        .from(githubConnections)
+        .where(eq(githubConnections.id, syncConfig.githubConnectionId!));
 
-    if (!githubConn || !githubConn.accessToken) {
-      return NextResponse.json(
-        { error: "GitHub connection not configured. Please connect your GitHub account." },
-        { status: 400 }
-      );
+      if (!githubConn || !githubConn.accessToken) {
+        return NextResponse.json(
+          { error: "GitHub connection not configured. Please connect your GitHub account." },
+          { status: 400 }
+        );
+      }
     }
 
     // 6. Check Google connection and refresh access token if needed

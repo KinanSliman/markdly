@@ -16,7 +16,7 @@ const iconMap = {
   google: Chrome,
 };
 
-export function SignInButton({ provider, label, callbackUrl = "/settings" }: SignInButtonProps) {
+export function SignInButton({ provider, label, callbackUrl = "/dashboard" }: SignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const Icon = iconMap[provider];
 

@@ -5,6 +5,8 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/database";
 import { users, sessions, accounts, verificationTokens, workspaces } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { credentialsProvider, hashPassword } from "@/lib/auth/credentials";
+import { trackSignup, trackOAuthConnect } from "@/lib/analytics";
 
 export const {
   handlers: { GET, POST },
@@ -46,11 +48,14 @@ export const {
         },
       },
     }),
+    credentialsProvider,
   ],
   callbacks: {
     async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
+        token.isAdmin = user.isAdmin;
+        token.signupSource = user.signupSource;
       }
       if (account) {
         token.accessToken = account.access_token;
@@ -60,7 +65,7 @@ export const {
       if (token.id) {
         try {
           const existingUser = await db
-            .select({ id: users.id })
+            .select({ id: users.id, isAdmin: users.isAdmin, signupSource: users.signupSource })
             .from(users)
             .where(eq(users.id, token.id as string))
             .limit(1);
@@ -70,6 +75,10 @@ export const {
             console.log("User not found in database, signing out...");
             return null;
           }
+
+          // Update token with latest user data
+          token.isAdmin = existingUser[0].isAdmin;
+          token.signupSource = existingUser[0].signupSource;
 
           // Create workspace for new users (only on first sign-in)
           // Check if user already has a workspace
@@ -105,10 +114,45 @@ export const {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.isAdmin = token.isAdmin;
+        session.user.signupSource = token.signupSource;
       }
       return session;
     },
-    async signIn() {
+    async signIn({ user, account }) {
+      // Update signup source for OAuth users and track analytics
+      if (account?.provider && user?.email) {
+        try {
+          const source = account.provider === "github" ? "github" : "google";
+
+          // Check if this is a new signup (email not verified yet)
+          const [existingUser] = await db
+            .select({ emailVerified: users.emailVerified })
+            .from(users)
+            .where(eq(users.email, user.email))
+            .limit(1);
+
+          const isNewSignup = !existingUser?.emailVerified;
+
+          await db
+            .update(users)
+            .set({
+              signupSource: source,
+              emailVerified: new Date(), // OAuth emails are verified
+            })
+            .where(eq(users.email, user.email));
+
+          // Track signup for new users
+          if (isNewSignup) {
+            await trackSignup(user.id, source);
+          }
+
+          // Track OAuth connection
+          await trackOAuthConnect(user.id, source);
+        } catch (error) {
+          console.error("Error updating signup source:", error);
+        }
+      }
       // Workspace creation is now handled in the jwt callback
       // to ensure the user is persisted before creating the workspace
       return true;

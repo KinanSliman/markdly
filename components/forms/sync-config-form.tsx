@@ -30,6 +30,7 @@ export function SyncConfigForm({ githubRepos, googleDocs, onSuccess }: SyncConfi
 
   const [formData, setFormData] = useState({
     name: "",
+    mode: "github" as "github" | "convert-only",
     githubRepo: "",
     googleDoc: "",
     framework: "nextjs",
@@ -38,6 +39,11 @@ export function SyncConfigForm({ githubRepos, googleDocs, onSuccess }: SyncConfi
     frontmatterTemplate: NEXTJS_TEMPLATE,
     syncSchedule: "manual",
   });
+
+  const modes = [
+    { value: "github", label: "GitHub Sync", description: "Sync to GitHub repository and create PRs" },
+    { value: "convert-only", label: "Convert Only", description: "Convert to Markdown and download (no GitHub)" },
+  ];
 
   const frameworks = [
     { value: "nextjs", label: "Next.js", template: NEXTJS_TEMPLATE },
@@ -65,17 +71,18 @@ export function SyncConfigForm({ githubRepos, googleDocs, onSuccess }: SyncConfi
     setLoading(true);
 
     try {
-      // Parse GitHub repo
-      const [repoOwner, repoName] = formData.githubRepo.split("/");
-
       // Parse Google Doc
       const [docId, docName] = formData.googleDoc.split(":");
+
+      // Parse GitHub repo (only for github mode)
+      const [repoOwner, repoName] = formData.mode === "github" ? formData.githubRepo.split("/") : [null, null];
 
       const response = await fetch("/api/sync-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
+          mode: formData.mode,
           repoOwner,
           repoName,
           docId,
@@ -121,7 +128,9 @@ export function SyncConfigForm({ githubRepos, googleDocs, onSuccess }: SyncConfi
       <CardHeader>
         <CardTitle>Create Sync Configuration</CardTitle>
         <CardDescription>
-          Configure how your Google Docs will be synced to GitHub
+          {formData.mode === "github"
+            ? "Configure how your Google Docs will be synced to GitHub"
+            : "Configure how your Google Docs will be converted to Markdown for download"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -138,25 +147,50 @@ export function SyncConfigForm({ githubRepos, googleDocs, onSuccess }: SyncConfi
             />
           </div>
 
-          {/* GitHub Repository */}
+          {/* Sync Mode */}
           <div className="space-y-2">
-            <Label htmlFor="githubRepo">GitHub Repository</Label>
+            <Label htmlFor="mode">Sync Mode</Label>
             <Select
-              value={formData.githubRepo}
-              onValueChange={(value: string) => setFormData({ ...formData, githubRepo: value })}
+              value={formData.mode}
+              onValueChange={(value: "github" | "convert-only") => setFormData({ ...formData, mode: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a repository" />
+                <SelectValue placeholder="Select sync mode" />
               </SelectTrigger>
               <SelectContent>
-                {githubRepos.map((repo) => (
-                  <SelectItem key={`${repo.owner}/${repo.name}`} value={`${repo.owner}/${repo.name}`}>
-                    {repo.owner}/{repo.name}
+                {modes.map((mode) => (
+                  <SelectItem key={mode.value} value={mode.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{mode.label}</span>
+                      <span className="text-xs text-muted-foreground">{mode.description}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {/* GitHub Repository (only shown for github mode) */}
+          {formData.mode === "github" && (
+            <div className="space-y-2">
+              <Label htmlFor="githubRepo">GitHub Repository</Label>
+              <Select
+                value={formData.githubRepo}
+                onValueChange={(value: string) => setFormData({ ...formData, githubRepo: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a repository" />
+                </SelectTrigger>
+                <SelectContent>
+                  {githubRepos.map((repo) => (
+                    <SelectItem key={`${repo.owner}/${repo.name}`} value={`${repo.owner}/${repo.name}`}>
+                      {repo.owner}/{repo.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Google Drive Document */}
           <div className="space-y-2">

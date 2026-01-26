@@ -1,20 +1,49 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { SignInButton } from "@/components/forms/signin-button";
-import { Github, Chrome, CheckCircle2, XCircle, ArrowRight, Settings } from "lucide-react";
+import { Github, Chrome, CheckCircle2, XCircle, ArrowRight, Settings, ShieldCheck, Mail } from "lucide-react";
 import { db } from "@/lib/database";
-import { accounts, workspaces, syncConfigs, syncHistory } from "@/db/schema";
+import { accounts, workspaces, syncConfigs, syncHistory, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 
 export default async function DashboardPage() {
   const session = await auth();
 
+  // If not authenticated, show sign-in prompt
   if (!session || !session.user) {
-    redirect("/api/auth/signin");
+    return (
+      <DashboardShell>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold">Welcome to Markdly</h1>
+            <p className="text-muted-foreground text-lg max-w-md">
+              Turn Google Docs into GitHub-ready Markdown. Sign in to get started.
+            </p>
+          </div>
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6 space-y-4">
+              <Button asChild className="w-full">
+                <Link href="/auth/signin">
+                  <Mail className="mr-2 h-4 w-4" />
+                  Sign in with Email
+                </Link>
+              </Button>
+              <SignInButton provider="github" label="Sign in with GitHub" callbackUrl="/dashboard" />
+              <SignInButton provider="google" label="Sign in with Google" callbackUrl="/dashboard" />
+              <p className="text-sm text-muted-foreground">
+                Don't have an account?{" "}
+                <Link href="/auth/signup" className="text-primary hover:underline">
+                  Sign up
+                </Link>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardShell>
+    );
   }
 
   // Check which providers are connected
@@ -26,6 +55,16 @@ export default async function DashboardPage() {
   const connectedProviders = new Set(userAccounts.map((a) => a.provider));
   const githubConnected = connectedProviders.has("github");
   const googleConnected = connectedProviders.has("google");
+
+  // Check email verification status for email/password users
+  const [user] = await db
+    .select({ emailVerified: users.emailVerified, signupSource: users.signupSource })
+    .from(users)
+    .where(eq(users.id, session.user.id!))
+    .limit(1);
+
+  const isEmailPasswordUser = user?.signupSource === "email";
+  const isEmailVerified = !!user?.emailVerified;
 
   // Get workspace and sync configs
   let [workspace] = await db
@@ -79,6 +118,28 @@ export default async function DashboardPage() {
             Welcome back, {session.user?.name || "User"}!
           </p>
         </div>
+
+        {/* Email Verification Warning */}
+        {isEmailPasswordUser && !isEmailVerified && (
+          <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+            <CardHeader>
+              <CardTitle className="text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Email Verification Required
+              </CardTitle>
+              <CardDescription className="text-amber-700 dark:text-amber-200">
+                Your email address has not been verified yet. Please check your email for a verification link, or request a new one.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="border-amber-300 text-amber-800">
+                <Link href="/auth/verify-email">
+                  Resend Verification Email
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Onboarding Banner */}
         {!allConnected && (

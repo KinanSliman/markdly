@@ -23,6 +23,12 @@ export const users = pgTable("users", {
   emailVerified: timestamp("emailVerified"),
   image: text("image"),
   avatar: text("avatar"),
+  // Email/password auth fields
+  passwordHash: text("password_hash"), // Only for email/password signups
+  signupSource: text("signup_source").default("email"), // 'email', 'github', 'google'
+  signupDate: timestamp("signup_date").notNull().defaultNow(),
+  lastLogin: timestamp("last_login"),
+  isAdmin: boolean("is_admin").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -99,6 +105,7 @@ export const syncConfigs = pgTable("sync_configs", {
   githubConnectionId: uuid("github_connection_id").references(() => githubConnections.id),
   googleConnectionId: uuid("google_connection_id").references(() => googleConnections.id),
   name: text("name"),
+  mode: text("mode").default("github"), // 'github' (sync to repo) or 'convert-only' (download only)
   framework: text("framework"), // 'nextjs', 'hugo', 'docusaurus', etc.
   outputPath: text("output_path"), // e.g., 'content/posts/'
   frontmatterTemplate: text("frontmatter_template"), // YAML template
@@ -112,6 +119,7 @@ export const syncConfigs = pgTable("sync_configs", {
 // Sync History
 export const syncHistory = pgTable("sync_history", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id),
   syncConfigId: uuid("sync_config_id").references(() => syncConfigs.id),
   docId: text("doc_id"),
   docTitle: text("doc_title"),
@@ -155,5 +163,14 @@ export const auditLogs = pgTable("audit_logs", {
   resourceType: text("resource_type"),
   resourceId: text("resource_id"),
   details: jsonb("details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Analytics (user event tracking)
+export const analytics = pgTable("analytics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  event: text("event").notNull(), // 'signup', 'oauth_connect', 'sync', 'sync_success', 'sync_failed'
+  metadata: jsonb("metadata"), // Event-specific data
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

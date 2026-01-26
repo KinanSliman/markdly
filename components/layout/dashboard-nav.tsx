@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Home, Settings, GitBranch, FileText, BarChart3, Cog } from "lucide-react";
+import { Home, Settings, GitBranch, FileText, BarChart3, Cog, ShieldCheck } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth/admin";
 
 const navItems = [
   {
@@ -34,10 +36,24 @@ const navItems = [
   },
 ];
 
-export function DashboardNav() {
+export async function DashboardNav() {
+  const admin = await isAdmin();
+
+  const adminNavItems = admin
+    ? [
+        {
+          href: "/admin",
+          label: "Admin",
+          icon: ShieldCheck,
+        },
+      ]
+    : [];
+
+  const allNavItems = [...navItems, ...adminNavItems];
+
   return (
     <nav className="space-y-2">
-      {navItems.map((item) => (
+      {allNavItems.map((item) => (
         <Link
           key={item.href}
           href={item.href}

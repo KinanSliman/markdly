@@ -6,7 +6,7 @@ interface DashboardShellProps {
   children: ReactNode;
 }
 
-export function DashboardShell({ children }: DashboardShellProps) {
+export async function DashboardShell({ children }: DashboardShellProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

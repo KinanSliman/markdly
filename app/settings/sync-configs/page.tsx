@@ -96,14 +96,20 @@ export default async function SyncConfigsPage() {
     .from(syncConfigs)
     .where(eq(syncConfigs.workspaceId, workspace.id!));
 
-  // Get tracked documents for each config
-  let trackedDocs: typeof documents.$inferSelect[] = [];
+  // Get tracked documents for each config with their sync config info
+  let trackedDocs: (typeof documents.$inferSelect & { syncConfig?: typeof syncConfigs.$inferSelect })[] = [];
   if (configs.length > 0) {
     const configIds = configs.map((c) => c.id).filter((id): id is string => id !== undefined);
-    trackedDocs = await db
+    const docs = await db
       .select()
       .from(documents)
       .where(inArray(documents.syncConfigId, configIds));
+
+    // Join with sync configs to get mode info
+    trackedDocs = docs.map((doc) => {
+      const syncConfig = configs.find((c) => c.id === doc.syncConfigId);
+      return { ...doc, syncConfig };
+    });
   }
 
   return (
@@ -228,7 +234,7 @@ export default async function SyncConfigsPage() {
                 <CardHeader>
                   <CardTitle>Tracked Documents</CardTitle>
                   <CardDescription>
-                    Documents ready to sync to GitHub
+                    Documents ready to sync or convert
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -241,6 +247,11 @@ export default async function SyncConfigsPage() {
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">{doc.title || "Untitled"}</span>
+                          {doc.syncConfig?.mode === "convert-only" && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                              Convert Only
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           {doc.lastSynced && (
@@ -257,7 +268,11 @@ export default async function SyncConfigsPage() {
                           )}
                         </div>
                       </div>
-                      <SyncButton docId={doc.googleDocId!} docName={doc.title!} />
+                      <SyncButton
+                        docId={doc.googleDocId!}
+                        docName={doc.title!}
+                        mode={doc.syncConfig?.mode || "github"}
+                      />
                     </div>
                   ))}
                 </CardContent>

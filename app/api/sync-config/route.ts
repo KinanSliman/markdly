@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       name,
+      mode = "github",
       repoOwner,
       repoName,
       docId,
@@ -32,9 +33,17 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // 3. Validate required fields
-    if (!name || !repoOwner || !repoName || !docId) {
+    if (!name || !docId) {
       return NextResponse.json(
-        { error: "Missing required fields: name, repoOwner, repoName, docId are required" },
+        { error: "Missing required fields: name, docId are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate GitHub repo is required for github mode
+    if (mode === "github" && (!repoOwner || !repoName)) {
+      return NextResponse.json(
+        { error: "repoOwner and repoName are required for GitHub sync mode" },
         { status: 400 }
       );
     }
@@ -57,47 +66,51 @@ export async function POST(request: NextRequest) {
       workspace = newWorkspace;
     }
 
-    // 5. Get GitHub access token from OAuth accounts
-    const [githubAccount] = await db
-      .select({ access_token: accounts.access_token })
-      .from(accounts)
-      .where(
-        and(
-          eq(accounts.userId, session.user.id),
-          eq(accounts.provider, "github")
-        )
-      );
+    // 5. Get GitHub connection (only for github mode)
+    let githubConn = null;
+    if (mode === "github") {
+      // Get GitHub access token from OAuth accounts
+      const [githubAccount] = await db
+        .select({ access_token: accounts.access_token })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.userId, session.user.id),
+            eq(accounts.provider, "github")
+          )
+        );
 
-    if (!githubAccount?.access_token) {
-      return NextResponse.json(
-        { error: "GitHub account not connected. Please connect GitHub first." },
-        { status: 400 }
-      );
-    }
+      if (!githubAccount?.access_token) {
+        return NextResponse.json(
+          { error: "GitHub account not connected. Please connect GitHub first." },
+          { status: 400 }
+        );
+      }
 
-    // 6. Get or create GitHub connection for this workspace
-    let [githubConn] = await db
-      .select()
-      .from(githubConnections)
-      .where(
-        and(
-          eq(githubConnections.workspaceId, workspace.id),
-          eq(githubConnections.repoOwner, repoOwner),
-          eq(githubConnections.repoName, repoName)
-        )
-      );
+      // Get or create GitHub connection for this workspace
+      [githubConn] = await db
+        .select()
+        .from(githubConnections)
+        .where(
+          and(
+            eq(githubConnections.workspaceId, workspace.id),
+            eq(githubConnections.repoOwner, repoOwner),
+            eq(githubConnections.repoName, repoName)
+          )
+        );
 
-    if (!githubConn) {
-      const [newGithubConn] = await db
-        .insert(githubConnections)
-        .values({
-          workspaceId: workspace.id,
-          repoOwner,
-          repoName,
-          accessToken: githubAccount.access_token,
-        })
-        .returning();
-      githubConn = newGithubConn;
+      if (!githubConn) {
+        const [newGithubConn] = await db
+          .insert(githubConnections)
+          .values({
+            workspaceId: workspace.id,
+            repoOwner,
+            repoName,
+            accessToken: githubAccount.access_token,
+          })
+          .returning();
+        githubConn = newGithubConn;
+      }
     }
 
     // 7. Get Google access token from OAuth accounts
@@ -160,9 +173,10 @@ export async function POST(request: NextRequest) {
       .insert(syncConfigs)
       .values({
         workspaceId: workspace.id,
-        githubConnectionId: githubConn.id,
+        githubConnectionId: githubConn?.id || null,
         googleConnectionId: googleConn.id,
         name,
+        mode,
         framework: framework || "nextjs",
         outputPath: outputPath || "content/posts/",
         frontmatterTemplate: frontmatterTemplate || "",

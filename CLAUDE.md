@@ -15,8 +15,11 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ### 1. **Authentication Setup** ✅
 - **GitHub OAuth**: Full integration with `repo` and `user:email` scopes
 - **Google OAuth**: Full integration with Drive + Docs API access (`drive.readonly`, `drive.file`)
+- **Email/Password Auth**: New! Sign up with email and password
+- **Email Verification**: Required for email/password users
 - **Session Management**: NextAuth.js with JWT strategy
 - **Database**: Drizzle ORM with PostgreSQL
+- **Admin Dashboard**: User management and analytics for admin users
 
 ### 2. **Dashboard & UI** ✅
 - Dashboard with connection status, sync history, tracked documents
@@ -25,9 +28,22 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - Toast notifications for feedback
 
 ### 3. **Database Schema** ✅
-**Tables**: users, sessions, accounts, verification_tokens, workspaces, github_connections, google_connections, sync_configs, sync_history, documents, api_keys, audit_logs
+**Tables**: users, sessions, accounts, verification_tokens, workspaces, github_connections, google_connections, sync_configs, sync_history, documents, api_keys, audit_logs, **analytics**
 
-- **sync_history** now includes `filePath` column for direct file downloads
+**users** table now includes:
+- `password_hash`: For email/password authentication
+- `signup_source`: 'email', 'github', or 'google'
+- `signup_date`: When user created account
+- `last_login`: Last login timestamp
+- `isAdmin`: Admin flag for admin dashboard access
+
+**analytics** table (new):
+- `id`, `userId`, `event`, `metadata`, `createdAt`
+- Tracks user events: signup, oauth_connect, sync, sync_success, sync_failed
+
+- **sync_history** now includes:
+- `filePath`: Path to the file in GitHub repo (for direct downloads)
+- `user_id`: User who performed the sync (for analytics tracking)
 
 ### 4. **Core Libraries** ✅
 - Google Docs API integration
@@ -50,6 +66,16 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - Missing workspace auto-creation → Added in auth callback and page fallbacks
 - Google Drive folder visibility → Changed to direct document selection
 - Expired Google OAuth tokens → Added automatic token refresh and reconnection flow
+
+### 7. **Email/Password Authentication & Admin Dashboard** ✅
+- **Email Signup**: Users can sign up with email and password
+- **Email Verification**: Required before dashboard access (simulated for demo)
+- **Admin Dashboard**:
+  - `/admin` - Overview with user stats, sync stats, success rates
+  - `/admin/users` - List all users with details (source, verification, sync count)
+  - `/admin/analytics` - Event tracking and analytics breakdown
+- **Analytics Tracking**: Tracks signup, OAuth connections, sync success/failure
+- **Admin Access**: Controlled by `ADMIN_EMAIL` env var or `isAdmin` flag
 
 ---
 
@@ -85,15 +111,21 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 
 1. **✅ GitHub OAuth** - Connected and working
 2. **✅ Google OAuth** - Connected with automatic token refresh
-3. **✅ Database** - All 12 tables created with correct types
-4. **✅ Dashboard** - Connection status, sync history, tracked documents
-5. **✅ Sync Execution** - Complete workflow with auto-retry on token expiry
-6. **✅ Document Selection** - Direct Google Doc selection (no folder limitation)
-7. **✅ Sync History** - Shows doc title, status, commit SHA, file count, timestamp
-8. **✅ Delete Functionality** - Sync history entries can be deleted with confirmation
-9. **✅ Google Docs → Markdown** - Tables, code blocks, headings, images, formatting
-10. **✅ Token Refresh** - Automatic reconnection flow for expired tokens
-11. **✅ Direct File Downloads** - Download synced files directly from GitHub in sync history
+3. **✅ Email/Password Auth** - Sign up and sign in with email/password
+4. **✅ Email Verification** - Required for email/password users
+5. **✅ Database** - All 13 tables created with correct types (including analytics), sync_history now tracks user_id
+6. **✅ Dashboard** - Connection status, sync history, tracked documents
+7. **✅ Sync Execution** - Complete workflow with auto-retry on token expiry
+8. **✅ Document Selection** - Direct Google Doc selection (no folder limitation)
+9. **✅ Sync History** - Shows doc title, status, commit SHA, file count, timestamp
+10. **✅ Delete Functionality** - Sync history entries can be deleted with confirmation
+11. **✅ Google Docs → Markdown** - Tables, code blocks, headings, images, formatting
+12. **✅ Token Refresh** - Automatic reconnection flow for expired tokens
+13. **✅ Direct File Downloads** - Download synced files directly from GitHub in sync history
+14. **✅ Document Preview** - Modern modal dialog with syntax-styled preview, copy button, and truncation indicators
+15. **✅ Convert-Only Mode** - Convert Google Docs to Markdown without GitHub sync (download directly)
+16. **✅ Analytics Tracking** - Track signup, OAuth connections, sync events
+17. **✅ Admin Dashboard** - User management and analytics for admin users
 
 ---
 
@@ -126,7 +158,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `id`, `syncConfigId`, `googleDocId`, `title`, `lastSynced`, `metadata` (commitSha, prUrl, filePath)
 
 ### sync_configs
-- `id`, `workspaceId`, `githubConnectionId`, `googleConnectionId`, `name`, `framework`, `outputPath`, `frontmatterTemplate`, `imageStrategy`
+- `id`, `workspaceId`, `githubConnectionId`, `googleConnectionId`, `name`, `mode` (github/convert-only), `framework`, `outputPath`, `frontmatterTemplate`, `imageStrategy`
 
 ---
 
@@ -167,21 +199,28 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ## Files Created/Updated
 
 ### Core Sync Logic
-- `lib/sync/index.ts` - Sync execution with auto token refresh
-- `app/api/sync/route.ts` - Sync API endpoint
-- `app/api/sync-config/route.ts` - Sync configuration API
+- `lib/sync/index.ts` - Sync execution with auto token refresh (supports convert-only mode)
+- `app/api/sync/route.ts` - Sync API endpoint (supports convert-only mode)
+- `app/api/sync-config/route.ts` - Sync configuration API (supports convert-only mode)
 - `app/api/sync-history/[id]/route.ts` - Delete sync history endpoint
 - `app/api/download/route.ts` - Download synced files from GitHub
+- `app/api/preview/route.ts` - Fetch markdown content for preview (first 2000 chars) with metadata
+- `app/api/convert-and-download/route.ts` - Convert Google Doc to Markdown and download directly
+
+### Authentication & Onboarding
+- `app/dashboard/page.tsx` - Shows sign-in prompt when not authenticated (removed redirect to /api/auth/signin)
+- `components/forms/signin-button.tsx` - Updated default callbackUrl to `/dashboard`
 
 ### UI Components
-- `components/forms/sync-config-form.tsx` - Create sync configurations
+- `components/forms/sync-config-form.tsx` - Create sync configurations (supports GitHub Sync vs Convert Only modes)
 - `components/forms/reconnect-google-button.tsx` - One-click Google reconnection
 - `components/forms/delete-sync-button.tsx` - Delete sync history with confirmation
-- `components/sync-history-list.tsx` - Client-side sync history list with download button
+- `components/forms/sync-button.tsx` - Sync button that adapts to mode (GitHub Sync vs Convert & Download)
+- `components/sync-history-list.tsx` - Client-side sync history list with download & preview buttons (modern modal UI with syntax-styled preview, copy functionality, truncation indicators)
 - `components/ui/dialog.tsx` - Radix UI Dialog component
 
 ### Pages
-- `app/settings/sync-configs/page.tsx` - Sync config management with reconnection flow
+- `app/settings/sync-configs/page.tsx` - Sync config management with reconnection flow, shows Convert Only badge
 - `app/dashboard/syncs/page.tsx` - Sync history with delete support and file downloads
 - `app/dashboard/documents/page.tsx` - Tracked documents
 
@@ -190,9 +229,10 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `lib/google/index.ts` - Added token refresh functions and `GoogleReconnectRequiredError`
 - `lib/cloudinary/index.ts` - Updated `processImagesInMarkdown()` to preserve Markdown syntax
 - `lib/markdown/converter.ts` - Added `processGoogleDocImage()` for authenticated image upload
-- `lib/sync/index.ts` - Integrated image processing into converter, saves `filePath` to sync_history
+- `lib/sync/index.ts` - Integrated image processing into converter, saves `filePath` to sync_history, supports convert-only mode
 - `app/api/auth/disconnect/route.ts` - Added sync cleanup (sync_history → documents → sync_configs)
 - `app/api/download/route.ts` - New endpoint for downloading synced files from GitHub
+- `app/api/convert-and-download/route.ts` - New endpoint for converting Google Docs to Markdown and downloading directly
 
 ---
 
@@ -209,6 +249,9 @@ NEXTAUTH_SECRET=your_nextauth_secret
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# Admin access (optional - for admin dashboard)
+ADMIN_EMAIL=your-email@example.com
 ```
 
 ---
@@ -234,6 +277,110 @@ CLOUDINARY_API_SECRET=your_api_secret
 - ❌ API access
 - ❌ Team collaboration features
 - ❌ Advanced image handling (responsive images, lazy loading)
+
+---
+
+## Email/Password Authentication & Admin Dashboard
+
+### Email/Password Auth Flow
+1. **Signup** (`/auth/signup`):
+   - User enters name, email, password
+   - Password is hashed with bcrypt (12 salt rounds)
+   - Account created with `signupSource: "email"`, `emailVerified: null`
+   - Analytics event `signup` tracked
+
+2. **Email Verification** (`/auth/verify-email`):
+   - Email verification required before dashboard access
+   - Verification token stored in `verification_tokens` table
+   - Email link: `/api/auth/verify-email?token=<token>`
+   - Marks user as verified and updates `emailVerified` timestamp
+
+3. **Signin** (`/auth/signin`):
+   - Email/password form validates credentials
+   - Updates `lastLogin` timestamp on successful sign-in
+   - Redirects to dashboard
+
+### Admin Dashboard
+**Access Control**:
+- Set `ADMIN_EMAIL` env var for admin access
+- Or set `isAdmin: true` in database for specific users
+
+**Pages**:
+- `/admin` - Overview with stats (total users, new users, active users, total syncs, success rate)
+- `/admin/users` - List all users with details:
+  - Name, email, signup source (email/github/google)
+  - Email verification status
+  - Admin status
+  - Sync count
+  - Signup date, last login
+- `/admin/analytics` - Event tracking breakdown:
+  - Event counts by type
+  - Recent events with metadata
+  - User event breakdown
+
+### Analytics Tracking
+**Tracked Events**:
+- `signup` - New user signup (with source: email/github/google)
+- `oauth_connect` - OAuth account connection
+- `sync_success` - Successful sync operation
+- `sync_failed` - Failed sync operation
+
+**Database**: `analytics` table with `userId`, `event`, `metadata`, `createdAt`
+
+### Files Created
+- `types/next-auth.d.ts` - Extended NextAuth types for custom session fields
+- `lib/auth/credentials.ts` - Credentials provider and password hashing
+- `lib/auth/admin.ts` - Admin access control functions
+- `lib/analytics/index.ts` - Analytics tracking functions
+- `components/forms/email-signup-form.tsx` - Email signup form
+- `components/forms/email-signin-form.tsx` - Email signin form
+- `app/api/auth/signup/route.ts` - Signup API endpoint
+- `app/api/auth/verify-email/route.ts` - Email verification API
+- `app/auth/signup/page.tsx` - Signup page
+- `app/auth/verify-email/page.tsx` - Verify email page
+- `app/admin/page.tsx` - Admin overview
+- `app/admin/users/page.tsx` - Admin users management
+- `app/admin/analytics/page.tsx` - Admin analytics
+- `app/api/admin/stats/route.ts` - Admin stats API
+- `app/api/admin/users/route.ts` - Admin users API
+- `db/migrations/0002_email_auth_analytics.sql` - SQL migration for email auth and analytics schema changes
+
+### Files Modified
+- `db/schema.ts` - Added password_hash, signup_source, signup_date, last_login, is_admin to users; added user_id to sync_history; created analytics table
+- `lib/auth/index.ts` - Added CredentialsProvider, updated callbacks for email auth and analytics
+- `lib/sync/index.ts` - Added analytics tracking for sync operations, added userId to sync_history
+- `app/auth/signin/page.tsx` - Added email/password form
+- `app/dashboard/page.tsx` - Added email verification warning, updated sign-in prompt
+- `components/layout/dashboard-nav.tsx` - Added admin link (conditional)
+- `components/layout/dashboard-shell.tsx` - Made async for admin check
+- `package.json` - Added bcryptjs and @types/bcryptjs dependencies
+
+### Database Migration
+```sql
+-- Add columns to users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_source TEXT DEFAULT 'email';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_date TIMESTAMP DEFAULT NOW();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
+
+-- Add user_id to sync_history for analytics tracking
+ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id);
+
+-- Create analytics table
+CREATE TABLE IF NOT EXISTS analytics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  event TEXT NOT NULL,
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_analytics_user_id ON analytics(user_id);
+CREATE INDEX idx_analytics_event ON analytics(event);
+CREATE INDEX idx_analytics_created_at ON analytics(created_at);
+CREATE INDEX idx_sync_history_user_id ON sync_history(user_id);
+```
 
 ---
 
@@ -274,10 +421,51 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 
 ---
 
+## User Flow
+
+### New User Onboarding (Email/Password)
+1. User lands on homepage (`/`)
+2. Clicks "Start Syncing Free" or "Get Started" → redirects to `/dashboard`
+3. Dashboard shows sign-in prompt with email/password option
+4. User clicks "Sign up" → `/auth/signup`
+5. User enters name, email, password → Account created
+6. User redirected to `/auth/verify-email` (email verification required)
+7. User verifies email (simulated for demo)
+8. User signs in with email/password → Redirected to `/dashboard`
+9. **Workspace is automatically created** in the JWT callback
+10. Dashboard shows onboarding banner with connection buttons
+11. User connects GitHub and Google accounts
+12. User creates sync configuration in Settings → Sync Configurations
+13. User syncs documents
+
+### New User Onboarding (OAuth)
+1. User lands on homepage (`/`)
+2. Clicks "Start Syncing Free" or "Get Started" → redirects to `/dashboard`
+3. Dashboard shows sign-in prompt (GitHub or Google)
+4. After signing in, user is redirected back to `/dashboard`
+5. **Workspace is automatically created** in the JWT callback
+6. Dashboard shows onboarding banner with connection buttons
+7. User connects GitHub and Google accounts
+8. User creates sync configuration in Settings → Sync Configurations
+9. User syncs documents
+
+### Returning User
+1. User visits `/dashboard` directly
+2. If not authenticated: shown sign-in prompt
+3. If authenticated: sees dashboard with connection status, sync history, etc.
+
+### Admin User
+1. Admin user signs in (email/password or OAuth)
+2. Admin sees "Admin" link in sidebar navigation
+3. Admin can access `/admin` dashboard
+4. View user stats, sync stats, success rates
+5. Manage users in `/admin/users`
+6. View analytics in `/admin/analytics`
+
 ## Testing the Sync Flow
 
-1. Connect GitHub account (Settings → GitHub Connection)
-2. Connect Google account (Settings → Google Connection)
+1. Connect GitHub account (Dashboard → "Connect GitHub" or Settings → GitHub Connection)
+2. Connect Google account (Dashboard → "Connect Google" or Settings → Google Connection)
 3. Go to Settings → Sync Configurations
 4. Create a new sync configuration:
    - Enter configuration name
@@ -300,6 +488,27 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 3. **expires_at type error** → Changed to `integer` (Unix timestamps)
 4. **Expired Google OAuth tokens** → Added automatic token refresh flow
 5. **Database clearing** → Sign out and sign back in to create new user
+
+## Authentication Flow Changes
+
+### Previous Flow
+1. Homepage → "Start Syncing Free" → `/api/auth/signin` (sign-in page)
+2. Sign in with provider → Redirected to `/settings`
+3. User connects accounts from Settings page
+4. Workspace created during auth callback
+
+### New Flow
+1. Homepage → "Start Syncing Free" → `/dashboard`
+2. **Dashboard shows sign-in prompt** if not authenticated
+3. Sign in with GitHub or Google → Redirected back to `/dashboard`
+4. **Workspace is automatically created** in JWT callback (unchanged)
+5. Dashboard shows onboarding banner with connection buttons
+6. User connects accounts directly from dashboard
+
+### Key Changes
+- **`app/dashboard/page.tsx`**: No longer redirects to sign-in page. Instead, shows a sign-in prompt UI when not authenticated
+- **`components/forms/signin-button.tsx`**: Default `callbackUrl` changed from `/settings` to `/dashboard`
+- **Workspace creation**: Still handled in `lib/auth/index.ts` JWT callback - works seamlessly with new flow
 
 ---
 

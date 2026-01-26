@@ -1,6 +1,7 @@
 import { db } from "@/lib/database";
 import { syncHistory, documents, syncConfigs, githubConnections, googleConnections } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import {
   convertGoogleDocToMarkdown,
   processCodeBlocks,
@@ -12,6 +13,7 @@ import {
 import { generateFrontMatter, wrapWithFrontMatter, getTemplateByFramework, extractVariablesFromContent } from "@/lib/markdown/frontmatter";
 import { createGitHubWorkflow } from "@/lib/github";
 import { getGoogleDoc, refreshGoogleAccessToken } from "@/lib/google";
+import { trackSync } from "@/lib/analytics";
 
 export interface SyncResult {
   success: boolean;
@@ -41,6 +43,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
     const [historyEntry] = await db
       .insert(syncHistory)
       .values({
+        userId,
         syncConfigId: configId,
         docId,
         status: "pending",
@@ -60,14 +63,17 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       throw new Error("Sync configuration not found");
     }
 
-    // 3. Fetch GitHub connection
-    const [githubConn] = await db
-      .select()
-      .from(githubConnections)
-      .where(eq(githubConnections.id, syncConfig.githubConnectionId!));
+    // 3. Fetch GitHub connection (only for github mode)
+    let githubConn = null;
+    if (syncConfig.mode === "github") {
+      [githubConn] = await db
+        .select()
+        .from(githubConnections)
+        .where(eq(githubConnections.id, syncConfig.githubConnectionId!));
 
-    if (!githubConn || !githubConn.accessToken) {
-      throw new Error("GitHub connection not found or not authorized");
+      if (!githubConn || !githubConn.accessToken) {
+        throw new Error("GitHub connection not found or not authorized");
+      }
     }
 
     // 4. Fetch Google connection
@@ -158,20 +164,33 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       .replace(/^-|-$/g, "") + ".md";
     const filePath = `${syncConfig.outputPath || "content/"}${fileName}`;
 
-    // 13. Generate branch name
-    const branchName = `markdly/${googleDoc.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
+    // 13. Handle sync based on mode
+    let commitSha: string | undefined;
+    let prNumber: number | undefined;
+    let prUrl: string | undefined;
 
-    // 14. Commit to GitHub and create PR
-    const { commitSha, prNumber, prUrl } = await createGitHubWorkflow({
-      owner: githubConn.repoOwner!,
-      repo: githubConn.repoName!,
-      filePath,
-      content: finalContent,
-      message: `docs: sync "${googleDoc.name}" from Google Docs\n\nAutomated sync from Markdly`,
-      title: `docs: sync "${googleDoc.name}"`,
-      body: `This PR was automatically created by Markdly to sync content from Google Docs.\n\n- **Document**: ${googleDoc.name}\n- **Source**: Google Docs\n- **Synced at**: ${new Date().toISOString()}`,
-      accessToken: githubConn.accessToken!,
-    });
+    if (syncConfig.mode === "github") {
+      // Generate branch name
+      const branchName = `markdly/${googleDoc.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
+
+      // Commit to GitHub and create PR
+      const result = await createGitHubWorkflow({
+        owner: githubConn!.repoOwner!,
+        repo: githubConn!.repoName!,
+        filePath,
+        content: finalContent,
+        message: `docs: sync "${googleDoc.name}" from Google Docs\n\nAutomated sync from Markdly`,
+        title: `docs: sync "${googleDoc.name}"`,
+        body: `This PR was automatically created by Markdly to sync content from Google Docs.\n\n- **Document**: ${googleDoc.name}\n- **Source**: Google Docs\n- **Synced at**: ${new Date().toISOString()}`,
+        accessToken: githubConn!.accessToken!,
+      });
+      commitSha = result.commitSha;
+      prNumber = result.prNumber;
+      prUrl = result.prUrl;
+    } else {
+      // Convert-only mode: generate a commit SHA for tracking (random UUID)
+      commitSha = randomUUID();
+    }
 
     // 15. Update or create document tracking
     const existingDoc = await db
@@ -225,6 +244,13 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       })
       .where(eq(syncHistory.id, syncHistoryId!));
 
+    // 17. Track analytics event
+    await trackSync(userId, configId, syncConfig.mode, true, {
+      docTitle: googleDoc.name,
+      filePath,
+      prUrl,
+    });
+
     return {
       success: true,
       commitSha,
@@ -245,6 +271,22 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
           completedAt: new Date(),
         })
         .where(eq(syncHistory.id, syncHistoryId));
+    }
+
+    // Track failed sync analytics
+    try {
+      const [syncConfig] = await db
+        .select()
+        .from(syncConfigs)
+        .where(eq(syncConfigs.id, configId));
+
+      if (syncConfig) {
+        await trackSync(userId, configId, syncConfig.mode, false, {
+          errorMessage,
+        });
+      }
+    } catch (e) {
+      // Ignore analytics errors during error handling
     }
 
     return {
