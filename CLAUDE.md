@@ -26,6 +26,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - Settings page with connection management
 - Protected routes (auth required)
 - Toast notifications for feedback
+- **Logout functionality** - Sign out button available in user menu (avatar dropdown) on all dashboard and admin pages
 
 ### 3. **Database Schema** ✅
 **Tables**: users, sessions, accounts, verification_tokens, workspaces, github_connections, google_connections, sync_configs, sync_history, documents, api_keys, audit_logs, **analytics**
@@ -125,7 +126,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 14. **✅ Document Preview** - Modern modal dialog with syntax-styled preview, copy button, and truncation indicators
 15. **✅ Convert-Only Mode** - Convert Google Docs to Markdown without GitHub sync (download directly)
 16. **✅ Analytics Tracking** - Track signup, OAuth connections, sync events
-17. **✅ Admin Dashboard** - User management and analytics for admin users
+17. **✅ Admin Dashboard** - User management and analytics for admin pages
+18. **✅ Logout Functionality** - Sign out button in user menu (avatar dropdown) for dashboard and admin pages
 
 ---
 
@@ -218,6 +220,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `components/forms/sync-button.tsx` - Sync button that adapts to mode (GitHub Sync vs Convert & Download)
 - `components/sync-history-list.tsx` - Client-side sync history list with download & preview buttons (modern modal UI with syntax-styled preview, copy functionality, truncation indicators)
 - `components/ui/dialog.tsx` - Radix UI Dialog component
+- `components/layout/user-menu.tsx` - User dropdown menu with logout button (Sign out option with LogOut icon)
 
 ### Pages
 - `app/settings/sync-configs/page.tsx` - Sync config management with reconnection flow, shows Convert Only badge
@@ -318,6 +321,11 @@ ADMIN_EMAIL=your-email@example.com
   - Recent events with metadata
   - User event breakdown
 
+**Logout**:
+- Available on all admin pages via user menu in header
+- Click user avatar (top-right) → Select "Sign out" from dropdown
+- Redirects to homepage after logout
+
 ### Analytics Tracking
 **Tracked Events**:
 - `signup` - New user signup (with source: email/github/google)
@@ -353,6 +361,7 @@ ADMIN_EMAIL=your-email@example.com
 - `app/dashboard/page.tsx` - Added email verification warning, updated sign-in prompt
 - `components/layout/dashboard-nav.tsx` - Added admin link (conditional)
 - `components/layout/dashboard-shell.tsx` - Made async for admin check
+- `components/layout/user-menu.tsx` - Added logout button with Sign out option (LogOut icon, redirects to homepage)
 - `package.json` - Added bcryptjs and @types/bcryptjs dependencies
 
 ### Database Migration
@@ -461,6 +470,7 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 4. View user stats, sync stats, success rates
 5. Manage users in `/admin/users`
 6. View analytics in `/admin/analytics`
+7. **Logout**: Click user avatar in top-right → Select "Sign out" from dropdown menu
 
 ## Testing the Sync Flow
 
