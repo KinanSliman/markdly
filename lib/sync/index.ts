@@ -219,6 +219,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
         status: "success",
         docTitle: googleDoc.name,
         commitSha,
+        filePath,
         filesChanged: "1",
         completedAt: new Date(),
       })

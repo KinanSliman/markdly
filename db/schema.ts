@@ -119,6 +119,7 @@ export const syncHistory = pgTable("sync_history", {
   errorMessage: text("error_message"),
   filesChanged: text("files_changed"),
   commitSha: text("commit_sha"),
+  filePath: text("file_path"), // Path to the file in GitHub repo
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
 });

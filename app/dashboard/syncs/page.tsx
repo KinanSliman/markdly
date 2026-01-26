@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/database";
-import { syncHistory, syncConfigs, workspaces } from "@/db/schema";
+import { syncHistory, syncConfigs, workspaces, documents } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { SyncHistoryList } from "@/components/sync-history-list";
 
@@ -37,6 +37,30 @@ export default async function SyncHistoryPage() {
         .from(syncHistory)
         .where(inArray(syncHistory.syncConfigId, configIds))
         .orderBy(syncHistory.startedAt);
+
+      // If sync history doesn't have filePath, try to get it from documents table
+      if (history.length > 0) {
+        const docIds = history
+          .map((h) => h.docId)
+          .filter((id): id is string => id !== null && id !== undefined);
+
+        if (docIds.length > 0) {
+          const trackedDocs = await db
+            .select({ googleDocId: documents.googleDocId, metadata: documents.metadata })
+            .from(documents)
+            .where(inArray(documents.googleDocId, docIds));
+
+          const docMetadataMap = new Map(
+            trackedDocs.map((doc) => [doc.googleDocId, doc.metadata?.filePath])
+          );
+
+          // Merge file path into history entries
+          history = history.map((entry) => ({
+            ...entry,
+            filePath: entry.filePath || (entry.docId ? docMetadataMap.get(entry.docId) : undefined),
+          }));
+        }
+      }
     }
   }
 

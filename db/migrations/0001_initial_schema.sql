@@ -70,8 +70,9 @@ CREATE TABLE IF NOT EXISTS sync_history (
     doc_title TEXT,
     status TEXT,
     error_message TEXT,
-    files_changed INTEGER,
+    files_changed TEXT,
     commit_sha TEXT,
+    file_path TEXT,
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE
 );

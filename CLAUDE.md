@@ -27,6 +27,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ### 3. **Database Schema** ✅
 **Tables**: users, sessions, accounts, verification_tokens, workspaces, github_connections, google_connections, sync_configs, sync_history, documents, api_keys, audit_logs
 
+- **sync_history** now includes `filePath` column for direct file downloads
+
 ### 4. **Core Libraries** ✅
 - Google Docs API integration
 - GitHub API (Octokit) integration
@@ -39,6 +41,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - Auto token refresh for expired Google OAuth tokens
 - Sync history with delete functionality
 - Tracked documents with one-click sync
+- **Direct file downloads** from sync history (downloads from GitHub via commit SHA)
 
 ### 6. **Critical Bug Fixes** ✅
 - OAuth redirect_uri_mismatch → Fixed callback URLs
@@ -90,6 +93,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 8. **✅ Delete Functionality** - Sync history entries can be deleted with confirmation
 9. **✅ Google Docs → Markdown** - Tables, code blocks, headings, images, formatting
 10. **✅ Token Refresh** - Automatic reconnection flow for expired tokens
+11. **✅ Direct File Downloads** - Download synced files directly from GitHub in sync history
 
 ---
 
@@ -115,7 +119,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ## Database Schema (Key Tables)
 
 ### sync_history
-- `id`, `syncConfigId`, `docId`, `docTitle`, `status` (pending/success/failed), `errorMessage`, `filesChanged`, `commitSha`, `startedAt`, `completedAt`
+- `id`, `syncConfigId`, `docId`, `docTitle`, `status` (pending/success/failed), `errorMessage`, `filesChanged`, `commitSha`, `filePath`, `startedAt`, `completedAt`
+- **`filePath`**: Path to the file in GitHub repo (used for direct downloads)
 
 ### documents (tracked)
 - `id`, `syncConfigId`, `googleDocId`, `title`, `lastSynced`, `metadata` (commitSha, prUrl, filePath)
@@ -166,17 +171,18 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `app/api/sync/route.ts` - Sync API endpoint
 - `app/api/sync-config/route.ts` - Sync configuration API
 - `app/api/sync-history/[id]/route.ts` - Delete sync history endpoint
+- `app/api/download/route.ts` - Download synced files from GitHub
 
 ### UI Components
 - `components/forms/sync-config-form.tsx` - Create sync configurations
 - `components/forms/reconnect-google-button.tsx` - One-click Google reconnection
 - `components/forms/delete-sync-button.tsx` - Delete sync history with confirmation
-- `components/sync-history-list.tsx` - Client-side sync history list
+- `components/sync-history-list.tsx` - Client-side sync history list with download button
 - `components/ui/dialog.tsx` - Radix UI Dialog component
 
 ### Pages
 - `app/settings/sync-configs/page.tsx` - Sync config management with reconnection flow
-- `app/dashboard/syncs/page.tsx` - Sync history with delete support
+- `app/dashboard/syncs/page.tsx` - Sync history with delete support and file downloads
 - `app/dashboard/documents/page.tsx` - Tracked documents
 
 ### Library Updates
@@ -184,8 +190,9 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `lib/google/index.ts` - Added token refresh functions and `GoogleReconnectRequiredError`
 - `lib/cloudinary/index.ts` - Updated `processImagesInMarkdown()` to preserve Markdown syntax
 - `lib/markdown/converter.ts` - Added `processGoogleDocImage()` for authenticated image upload
-- `lib/sync/index.ts` - Integrated image processing into converter
+- `lib/sync/index.ts` - Integrated image processing into converter, saves `filePath` to sync_history
 - `app/api/auth/disconnect/route.ts` - Added sync cleanup (sync_history → documents → sync_configs)
+- `app/api/download/route.ts` - New endpoint for downloading synced files from GitHub
 
 ---
 
@@ -227,6 +234,29 @@ CLOUDINARY_API_SECRET=your_api_secret
 - ❌ API access
 - ❌ Team collaboration features
 - ❌ Advanced image handling (responsive images, lazy loading)
+
+---
+
+## Direct File Download Feature
+
+### How It Works
+1. **Database**: Added `filePath` column to `sync_history` table
+2. **Sync Execution**: When a sync succeeds, the file path is saved to `sync_history`
+3. **API Endpoint**: `/api/download?syncId=<id>` fetches file content from GitHub using commit SHA and file path
+4. **UI**: Download button appears on each successful sync entry in the Sync History page
+
+### Files Modified
+- `db/schema.ts` - Added `filePath` to sync_history table
+- `db/migrations/0001_initial_schema.sql` - Added `file_path TEXT` column
+- `lib/sync/index.ts` - Saves `filePath` when updating sync history
+- `app/api/download/route.ts` - New endpoint for downloading files from GitHub
+- `app/dashboard/syncs/page.tsx` - Fetches file path from documents table for backward compatibility
+- `components/sync-history-list.tsx` - Added download button with loading state
+
+### Database Migration (Manual)
+```sql
+ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
+```
 
 ---
 

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GitCommit, FileText, Clock } from "lucide-react";
+import { GitCommit, FileText, Clock, Download } from "lucide-react";
 import { DeleteSyncButton } from "@/components/forms/delete-sync-button";
+import { Button } from "@/components/ui/button";
 
 interface SyncHistoryEntry {
   id: string;
@@ -14,6 +15,7 @@ interface SyncHistoryEntry {
   filesChanged?: string | null;
   errorMessage?: string | null;
   startedAt?: Date | null;
+  filePath?: string | null;
 }
 
 interface SyncHistoryListProps {
@@ -22,9 +24,35 @@ interface SyncHistoryListProps {
 
 export function SyncHistoryList({ initialHistory }: SyncHistoryListProps) {
   const [history, setHistory] = useState<SyncHistoryEntry[]>(initialHistory);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const handleDelete = (syncId: string) => {
     setHistory((prev) => prev.filter((entry) => entry.id !== syncId));
+  };
+
+  const handleDownload = async (syncId: string, fileName?: string | null) => {
+    setDownloading(syncId);
+    try {
+      const response = await fetch(`/api/download?syncId=${syncId}`);
+
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || "download.md";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download error:", error);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -97,7 +125,18 @@ export function SyncHistoryList({ initialHistory }: SyncHistoryListProps) {
                   </p>
                 )}
               </div>
-              <div className="ml-4">
+              <div className="ml-4 flex gap-2">
+                {entry.status === "success" && entry.filePath && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(entry.id, entry.docTitle)}
+                    disabled={downloading === entry.id}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {downloading === entry.id ? "Downloading..." : "Download"}
+                  </Button>
+                )}
                 <DeleteSyncButton
                   syncId={entry.id}
                   docTitle={entry.docTitle || undefined}
