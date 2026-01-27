@@ -15,10 +15,10 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <Button variant="ghost" asChild>
-              <Link href="/dashboard">Sign In</Link>
+              <Link href="/auth/signin">Sign In</Link>
             </Button>
             <Button asChild>
-              <Link href="/dashboard">Get Started</Link>
+              <Link href="/converter">Try Converter</Link>
             </Button>
           </div>
         </div>
@@ -36,7 +36,7 @@ export default function LandingPage() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" asChild>
-            <Link href="/dashboard">
+            <Link href="/converter">
               Start Syncing Free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -91,7 +91,7 @@ export default function LandingPage() {
               Join developer relations teams and open-source projects already using Markdly to sync their documentation.
             </p>
             <Button size="lg" asChild>
-              <Link href="/dashboard">Get Started Now</Link>
+              <Link href="/converter">Try Converter Now</Link>
             </Button>
           </CardContent>
         </Card>

@@ -72,9 +72,9 @@ export default function VerifyEmailPage() {
           <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
             <Mail className="h-6 w-6 text-muted-foreground" />
           </div>
-          <CardTitle className="text-2xl">Verify Your Email</CardTitle>
+          <CardTitle className="text-2xl">Email Verification</CardTitle>
           <CardDescription>
-            Check your email for a verification link
+            Email verification is optional for this demo
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -93,7 +93,7 @@ export default function VerifyEmailPage() {
           )}
 
           <p className="text-sm text-muted-foreground text-center">
-            After verifying your email, you can sign in and connect your GitHub and Google accounts to start syncing documents.
+            Email verification is optional for this demo. You can sign in and connect your GitHub and Google accounts to start syncing documents.
           </p>
 
           <div className="space-y-2">

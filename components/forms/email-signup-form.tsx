@@ -59,14 +59,14 @@ export function EmailSignupForm({ onSignup }: EmailSignupFormProps) {
         return;
       }
 
-      setSuccess("Account created! Please check your email to verify your account.");
+      setSuccess("Account created! Redirecting to dashboard...");
       if (onSignup) {
         onSignup();
       }
-      // Redirect to verify email page after a short delay
+      // Redirect to dashboard after a short delay
       setTimeout(() => {
-        router.push("/auth/verify-email");
-      }, 1500);
+        router.push("/dashboard");
+      }, 1000);
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);

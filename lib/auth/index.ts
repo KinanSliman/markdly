@@ -65,7 +65,7 @@ export const {
       if (token.id) {
         try {
           const existingUser = await db
-            .select({ id: users.id, isAdmin: users.isAdmin, signupSource: users.signupSource })
+            .select()
             .from(users)
             .where(eq(users.id, token.id as string))
             .limit(1);
@@ -77,8 +77,8 @@ export const {
           }
 
           // Update token with latest user data
-          token.isAdmin = existingUser[0].isAdmin;
-          token.signupSource = existingUser[0].signupSource;
+          token.isAdmin = existingUser[0].isAdmin ?? false;
+          token.signupSource = existingUser[0].signupSource ?? "email";
 
           // Create workspace for new users (only on first sign-in)
           // Check if user already has a workspace

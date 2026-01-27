@@ -51,20 +51,19 @@ export async function POST(request: NextRequest) {
         passwordHash,
         signupSource: "email",
         signupDate: new Date(),
-        emailVerified: null, // Email verification required
+        emailVerified: new Date(), // Email verification skipped for demo
       })
       .returning({ id: users.id, email: users.email, name: users.name });
 
     // Track signup event
     await trackSignup(newUser.id, "email");
 
-    // Note: In production, you would send a verification email here
-    // For now, we'll simulate it by returning success
-    console.log(`New user created: ${newUser.email}. Email verification required.`);
+    // Note: Email verification is skipped for demo purposes
+    console.log(`New user created: ${newUser.email}`);
 
     return NextResponse.json(
       {
-        message: "Account created successfully. Please verify your email.",
+        message: "Account created successfully.",
         user: { id: newUser.id, email: newUser.email },
       },
       { status: 201 }

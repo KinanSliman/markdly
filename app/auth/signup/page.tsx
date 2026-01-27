@@ -28,15 +28,6 @@ export default async function SignupPage() {
                 Sign in
               </Link>
             </p>
-            <p className="text-center text-sm text-muted-foreground mt-2">
-              Or sign in with{" "}
-              <Link
-                href="/auth/signin"
-                className="text-primary font-medium hover:underline"
-              >
-                GitHub or Google
-              </Link>
-            </p>
           </CardContent>
         </Card>
       </div>

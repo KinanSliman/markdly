@@ -78,6 +78,19 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Analytics Tracking**: Tracks signup, OAuth connections, sync success/failure
 - **Admin Access**: Controlled by `ADMIN_EMAIL` env var or `isAdmin` flag
 
+### 8. **Sign-In Page Simplification** ✅
+- **Email-only sign-in**: Sign-in page now only shows email/password option
+- **OAuth connections deferred**: Users can connect GitHub and Google accounts later from the dashboard
+- **Reduced friction**: New users sign up with email, then connect OAuth providers when ready
+
+### 9. **Web-Based Converter Demo (No Sign-In Required)** ✅
+- **Try Markdly without signing in**: Users can convert Google Docs to Markdown instantly
+- **Split-screen preview**: Shows original Google Doc (left) and converted Markdown (right)
+- **Copy to clipboard**: Users can copy the converted Markdown without downloading
+- **Sign-in prompt**: Clear call-to-action to sign in for full features (download, GitHub sync)
+- **Public demo endpoint**: `/converter` page with `/api/convert-demo` API endpoint
+- **Zero database storage**: Demo mode doesn't store any user data
+
 ---
 
 ## Competitive Advantage Features
@@ -128,6 +141,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 16. **✅ Analytics Tracking** - Track signup, OAuth connections, sync events
 17. **✅ Admin Dashboard** - User management and analytics for admin pages
 18. **✅ Logout Functionality** - Sign out button in user menu (avatar dropdown) for dashboard and admin pages
+19. **✅ Simplified Sign-In** - Email-only sign-in page, OAuth connections deferred to dashboard
+20. **✅ Web-Based Converter Demo** - Try Markdly without sign-in, split-screen preview, copy to clipboard
 
 ---
 
@@ -209,6 +224,10 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `app/api/preview/route.ts` - Fetch markdown content for preview (first 2000 chars) with metadata
 - `app/api/convert-and-download/route.ts` - Convert Google Doc to Markdown and download directly
 
+### Web-Based Converter Demo (No Sign-In Required)
+- `app/converter/page.tsx` - Converter demo page with split-screen preview (Google Doc vs Markdown)
+- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs without authentication
+
 ### Authentication & Onboarding
 - `app/dashboard/page.tsx` - Shows sign-in prompt when not authenticated (removed redirect to /api/auth/signin)
 - `components/forms/signin-button.tsx` - Updated default callbackUrl to `/dashboard`
@@ -223,6 +242,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `components/layout/user-menu.tsx` - User dropdown menu with logout button (Sign out option with LogOut icon)
 
 ### Pages
+- `app/page.tsx` - Homepage with updated navigation (Sign In button, Try Converter button)
+- `app/converter/page.tsx` - Converter demo page with split-screen preview
 - `app/settings/sync-configs/page.tsx` - Sync config management with reconnection flow, shows Convert Only badge
 - `app/dashboard/syncs/page.tsx` - Sync history with delete support and file downloads
 - `app/dashboard/documents/page.tsx` - Tracked documents
@@ -342,6 +363,7 @@ ADMIN_EMAIL=your-email@example.com
 - `lib/analytics/index.ts` - Analytics tracking functions
 - `components/forms/email-signup-form.tsx` - Email signup form
 - `components/forms/email-signin-form.tsx` - Email signin form
+- `components/ui/alert.tsx` - Alert component for error messages
 - `app/api/auth/signup/route.ts` - Signup API endpoint
 - `app/api/auth/verify-email/route.ts` - Email verification API
 - `app/auth/signup/page.tsx` - Signup page
@@ -351,14 +373,17 @@ ADMIN_EMAIL=your-email@example.com
 - `app/admin/analytics/page.tsx` - Admin analytics
 - `app/api/admin/stats/route.ts` - Admin stats API
 - `app/api/admin/users/route.ts` - Admin users API
+- `app/converter/page.tsx` - Converter demo page with split-screen preview
+- `app/api/convert-demo/route.ts` - Public API endpoint for demo conversions
 - `db/migrations/0002_email_auth_analytics.sql` - SQL migration for email auth and analytics schema changes
 
 ### Files Modified
+- `app/page.tsx` - Updated navigation: "Sign In" links to `/auth/signin`, "Start Syncing Free" links to `/converter`
 - `db/schema.ts` - Added password_hash, signup_source, signup_date, last_login, is_admin to users; added user_id to sync_history; created analytics table
-- `lib/auth/index.ts` - Added CredentialsProvider, updated callbacks for email auth and analytics
+- `lib/auth/index.ts` - Added CredentialsProvider, updated callbacks for email auth and analytics, fixed Drizzle ORM query for user lookup
 - `lib/sync/index.ts` - Added analytics tracking for sync operations, added userId to sync_history
-- `app/auth/signin/page.tsx` - Added email/password form
-- `app/dashboard/page.tsx` - Added email verification warning, updated sign-in prompt
+- `app/auth/signin/page.tsx` - Added email/password form, removed OAuth buttons (email-only sign-in)
+- `app/dashboard/page.tsx` - Added email verification warning, updated sign-in prompt (email-only, removed OAuth buttons)
 - `components/layout/dashboard-nav.tsx` - Added admin link (conditional)
 - `components/layout/dashboard-shell.tsx` - Made async for admin check
 - `components/layout/user-menu.tsx` - Added logout button with Sign out option (LogOut icon, redirects to homepage)
@@ -434,8 +459,8 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 
 ### New User Onboarding (Email/Password)
 1. User lands on homepage (`/`)
-2. Clicks "Start Syncing Free" or "Get Started" → redirects to `/dashboard`
-3. Dashboard shows sign-in prompt with email/password option
+2. **Option A - Try First**: Clicks "Start Syncing Free" → redirects to `/converter` (try without sign-in)
+3. **Option B - Sign Up**: Clicks "Sign In" in navigation → `/auth/signin`
 4. User clicks "Sign up" → `/auth/signup`
 5. User enters name, email, password → Account created
 6. User redirected to `/auth/verify-email` (email verification required)
@@ -443,20 +468,43 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 8. User signs in with email/password → Redirected to `/dashboard`
 9. **Workspace is automatically created** in the JWT callback
 10. Dashboard shows onboarding banner with connection buttons
-11. User connects GitHub and Google accounts
+11. User connects GitHub and Google accounts from dashboard
 12. User creates sync configuration in Settings → Sync Configurations
 13. User syncs documents
 
-### New User Onboarding (OAuth)
+### New User Onboarding (Try Before Signing In)
 1. User lands on homepage (`/`)
-2. Clicks "Start Syncing Free" or "Get Started" → redirects to `/dashboard`
-3. Dashboard shows sign-in prompt (GitHub or Google)
-4. After signing in, user is redirected back to `/dashboard`
+2. Clicks "Start Syncing Free" → redirects to `/converter`
+3. **Converter Demo Page** shows:
+   - Input field for Google Doc URL
+   - "Convert" button (no sign-in required)
+   - Split-screen preview: Google Doc (left) vs Markdown (right)
+   - Stats showing headings, tables, images found
+   - "Copy Markdown" button (copy to clipboard)
+   - "Sign In to Download" disabled button with lock icon
+   - Sign-in prompt card at bottom
+4. User can try the converter without any account
+5. To download or sync to GitHub, user must sign in via the prompt
+
+### Converter Demo Features
+- **No database storage**: Demo mode doesn't save any data
+- **Split-screen UI**: Visual comparison of original vs converted content
+- **Copy to clipboard**: Users can copy the Markdown output
+- **Sign-in required for download**: Clear CTA to sign in for full features
+- **Public API endpoint**: `/api/convert-demo` for demo conversions
+
+### New User Onboarding (OAuth - Deferred)
+1. User lands on homepage (`/`)
+2. Clicks "Sign In" → `/auth/signin`
+3. Dashboard shows email-only sign-in prompt
+4. User signs in with email/password
 5. **Workspace is automatically created** in the JWT callback
-6. Dashboard shows onboarding banner with connection buttons
-7. User connects GitHub and Google accounts
+6. Dashboard shows onboarding banner with "Connect GitHub" and "Connect Google" buttons
+7. User connects GitHub and Google accounts from dashboard
 8. User creates sync configuration in Settings → Sync Configurations
 9. User syncs documents
+
+**Note**: OAuth sign-in is no longer available on the initial sign-in page. Users must sign in with email first, then connect OAuth providers from the dashboard onboarding banner or Settings page.
 
 ### Returning User
 1. User visits `/dashboard` directly
@@ -471,6 +519,18 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 5. Manage users in `/admin/users`
 6. View analytics in `/admin/analytics`
 7. **Logout**: Click user avatar in top-right → Select "Sign out" from dropdown menu
+
+## Testing the Converter Demo (No Sign-In Required)
+
+1. Visit the homepage (`/`)
+2. Click "Start Syncing Free" → redirects to `/converter`
+3. Enter a Google Doc URL or ID in the input field
+4. Click "Convert" button
+5. See the split-screen preview:
+   - **Left**: Original Google Doc (shows authentication note for private docs)
+   - **Right**: Converted Markdown output
+6. Click "Copy Markdown" to copy the output to clipboard
+7. Click "Sign In Now" to sign in and access full features (download, GitHub sync)
 
 ## Testing the Sync Flow
 
@@ -498,6 +558,10 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 3. **expires_at type error** → Changed to `integer` (Unix timestamps)
 4. **Expired Google OAuth tokens** → Added automatic token refresh flow
 5. **Database clearing** → Sign out and sign back in to create new user
+6. **Drizzle ORM query error** → Fixed `lib/auth/index.ts` to use `select()` without column aliases
+7. **Missing Alert component** → Created `components/ui/alert.tsx` for error messages in sign-in form
+8. **Missing `mode` column in sync_configs** → Added `mode TEXT DEFAULT 'github'` column to `sync_configs` table (required by dashboard page query). Run `npm run db:push` to apply. Migration file: `db/migrations/0003_fix_schema_mismatch.sql`
+9. **Sessions table primary key conflict** → Dropped and recreated `sessions` table to fix `multiple primary keys for table "sessions" are not allowed` error. Run `DROP TABLE IF EXISTS sessions CASCADE;` then `npm run db:push`
 
 ## Authentication Flow Changes
 
@@ -507,24 +571,54 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 3. User connects accounts from Settings page
 4. Workspace created during auth callback
 
-### New Flow
+### Current Flow
 1. Homepage → "Start Syncing Free" → `/dashboard`
-2. **Dashboard shows sign-in prompt** if not authenticated
-3. Sign in with GitHub or Google → Redirected back to `/dashboard`
+2. **Dashboard shows email-only sign-in prompt** if not authenticated
+3. User signs in with email/password → Redirected back to `/dashboard`
 4. **Workspace is automatically created** in JWT callback (unchanged)
-5. Dashboard shows onboarding banner with connection buttons
-6. User connects accounts directly from dashboard
+5. Dashboard shows onboarding banner with "Connect GitHub" and "Connect Google" buttons
+6. User connects OAuth accounts directly from dashboard
 
 ### Key Changes
-- **`app/dashboard/page.tsx`**: No longer redirects to sign-in page. Instead, shows a sign-in prompt UI when not authenticated
+- **`app/page.tsx`**: Homepage navigation updated - "Sign In" button links to `/auth/signin`, "Start Syncing Free" links to `/converter`
+- **`app/dashboard/page.tsx`**: No longer redirects to sign-in page. Shows email-only sign-in prompt UI when not authenticated
+- **`app/auth/signin/page.tsx`**: Simplified to only show email/password form, removed GitHub/Google OAuth buttons
 - **`components/forms/signin-button.tsx`**: Default `callbackUrl` changed from `/settings` to `/dashboard`
 - **Workspace creation**: Still handled in `lib/auth/index.ts` JWT callback - works seamlessly with new flow
+- **OAuth deferral**: Users connect GitHub/Google accounts after signing in, not during initial sign-in
+- **New `/converter` page**: Web-based demo converter with split-screen preview, no sign-in required
+- **New `/api/convert-demo` endpoint**: Public API for demo conversions without authentication
 
 ---
 
 ## Success Criteria
 
 **10 paying customers in 3 months** = validation
+
+---
+
+## Environment Variables (Updated)
+
+```env
+POSTGRES_URL=your_postgres_url
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_nextauth_secret
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Admin access (optional - for admin dashboard)
+ADMIN_EMAIL=your-email@example.com
+
+# Demo converter (optional - for publicly accessible Google Docs)
+GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token
+```
+
+**Note**: `GOOGLE_DEMO_ACCESS_TOKEN` is optional. Without it, the converter demo will show an error prompting users to sign in for private document access.
 
 ---
 

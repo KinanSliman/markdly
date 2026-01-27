@@ -3,7 +3,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { SignInButton } from "@/components/forms/signin-button";
-import { Github, Chrome, CheckCircle2, XCircle, ArrowRight, Settings, ShieldCheck, Mail } from "lucide-react";
+import { Github, Chrome, CheckCircle2, XCircle, ArrowRight, Settings, Mail } from "lucide-react";
 import { db } from "@/lib/database";
 import { accounts, workspaces, syncConfigs, syncHistory, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -31,8 +31,6 @@ export default async function DashboardPage() {
                   Sign in with Email
                 </Link>
               </Button>
-              <SignInButton provider="github" label="Sign in with GitHub" callbackUrl="/dashboard" />
-              <SignInButton provider="google" label="Sign in with Google" callbackUrl="/dashboard" />
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
                 <Link href="/auth/signup" className="text-primary hover:underline">
@@ -55,16 +53,6 @@ export default async function DashboardPage() {
   const connectedProviders = new Set(userAccounts.map((a) => a.provider));
   const githubConnected = connectedProviders.has("github");
   const googleConnected = connectedProviders.has("google");
-
-  // Check email verification status for email/password users
-  const [user] = await db
-    .select({ emailVerified: users.emailVerified, signupSource: users.signupSource })
-    .from(users)
-    .where(eq(users.id, session.user.id!))
-    .limit(1);
-
-  const isEmailPasswordUser = user?.signupSource === "email";
-  const isEmailVerified = !!user?.emailVerified;
 
   // Get workspace and sync configs
   let [workspace] = await db
@@ -118,28 +106,6 @@ export default async function DashboardPage() {
             Welcome back, {session.user?.name || "User"}!
           </p>
         </div>
-
-        {/* Email Verification Warning */}
-        {isEmailPasswordUser && !isEmailVerified && (
-          <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-            <CardHeader>
-              <CardTitle className="text-amber-900 dark:text-amber-100 flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5" />
-                Email Verification Required
-              </CardTitle>
-              <CardDescription className="text-amber-700 dark:text-amber-200">
-                Your email address has not been verified yet. Please check your email for a verification link, or request a new one.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" className="border-amber-300 text-amber-800">
-                <Link href="/auth/verify-email">
-                  Resend Verification Email
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Onboarding Banner */}
         {!allConnected && (
