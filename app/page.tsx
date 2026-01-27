@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon, FileText, Upload, Lock, Zap } from "lucide-react";
 import Link from "next/link";
 
 export default function LandingPage() {
@@ -80,6 +81,68 @@ export default function LandingPage() {
             </CardHeader>
           </Card>
         </div>
+      </section>
+
+      {/* Supported Formats */}
+      <section className="max-w-6xl mx-auto px-4 py-16">
+        <h2 className="text-3xl font-bold text-center mb-8">Supported Formats</h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <BookOpen className="h-6 w-6 text-primary" />
+                <CardTitle className="text-xl">Google Docs</CardTitle>
+              </div>
+              <CardDescription>
+                Full support with tables, code blocks, headings, images, and formatting. Requires Google OAuth connection for private documents.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <FileText className="h-6 w-6 text-primary" />
+                <CardTitle className="text-xl">DOCX (Word)</CardTitle>
+              </div>
+              <CardDescription>
+                High-quality conversion using mammoth.js. Upload directly without sign-in. Preserves headings, tables, and formatting.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Upload className="h-6 w-6 text-primary" />
+                <CardTitle className="text-xl">HTML & RTF</CardTitle>
+              </div>
+              <CardDescription>
+                Direct file upload conversion. No sign-in required. Perfect for exported content from other tools.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Zap className="h-6 w-6 text-primary" />
+                <CardTitle className="text-xl">TXT (Plain Text)</CardTitle>
+              </div>
+              <CardDescription>
+                Simple text files with preserved line breaks. Quick conversion for basic content.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* OAuth Requirement Notice */}
+        <Alert className="mt-6 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+          <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <strong>Google Docs require sign-in:</strong> To convert Google Docs, you need to connect your Google account via OAuth. This is because Google Docs are private and require authentication to access. For public file uploads (DOCX, HTML, RTF, TXT), no sign-in is required.
+          </AlertDescription>
+        </Alert>
       </section>
 
       {/* CTA */}

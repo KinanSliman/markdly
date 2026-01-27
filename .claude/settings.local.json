@@ -10,7 +10,8 @@
       "Bash(npx tsx:*)",
       "Bash(node:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(npm run db:push:*)"
+      "Bash(npm run db:push:*)",
+      "Bash(xxd:*)"
     ]
   }
 }

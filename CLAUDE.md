@@ -85,11 +85,20 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 
 ### 9. **Web-Based Converter Demo (No Sign-In Required)** ✅
 - **Try Markdly without signing in**: Users can convert Google Docs to Markdown instantly
-- **Split-screen preview**: Shows original Google Doc (left) and converted Markdown (right)
+- **File upload support**: Upload HTML, RTF, TXT, or DOCX files from your device
+  - **DOCX**: Uses `mammoth.js` for high-quality conversion with proper heading, table, and formatting preservation
+  - **HTML/RTF/TXT**: Direct conversion with regex-based parsing
+- **Split-screen preview**: Shows original document (left) and converted Markdown (right)
 - **Copy to clipboard**: Users can copy the converted Markdown without downloading
 - **Sign-in prompt**: Clear call-to-action to sign in for full features (download, GitHub sync)
 - **Public demo endpoint**: `/converter` page with `/api/convert-demo` API endpoint
 - **Zero database storage**: Demo mode doesn't store any user data
+
+### 10. **Clear Format Documentation & OAuth Transparency** ✅
+- **Homepage "Supported Formats" section**: Clearly lists all supported formats with icons
+- **OAuth requirement notice**: Amber alert box explaining Google Docs require sign-in
+- **Converter page updates**: Explicit labels showing "Requires Google OAuth sign-in" for Google Docs section
+- **Reduced user confusion**: Sets proper expectations before users try the converter
 
 ---
 
@@ -143,6 +152,9 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 18. **✅ Logout Functionality** - Sign out button in user menu (avatar dropdown) for dashboard and admin pages
 19. **✅ Simplified Sign-In** - Email-only sign-in page, OAuth connections deferred to dashboard
 20. **✅ Web-Based Converter Demo** - Try Markdly without sign-in, split-screen preview, copy to clipboard
+21. **✅ File Upload for Converter** - Upload HTML, RTF, TXT, DOCX files from device
+22. **✅ DOCX to Markdown** - High-quality conversion using mammoth.js library (preserves headings, tables, formatting)
+23. **✅ Format Documentation** - Homepage "Supported Formats" section with OAuth transparency for Google Docs
 
 ---
 
@@ -225,8 +237,12 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `app/api/convert-and-download/route.ts` - Convert Google Doc to Markdown and download directly
 
 ### Web-Based Converter Demo (No Sign-In Required)
-- `app/converter/page.tsx` - Converter demo page with split-screen preview (Google Doc vs Markdown)
-- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs without authentication
+- `app/converter/page.tsx` - Converter demo page with split-screen preview (Google Doc vs Markdown) + File upload support (HTML, RTF, TXT, DOCX). Updated with OAuth requirement notice for Google Docs
+- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs and uploaded files without authentication. Uses `mammoth.js` for high-quality DOCX conversion. **Note**: Line 211 uses single quotes to avoid escaping issues: `.replace(/&quot;/g, '"')`
+- `app/page.tsx` - Added "Supported Formats" section with OAuth transparency notice for Google Docs
+
+### Dependencies
+- `mammoth` - Added for high-quality DOCX to HTML/Markdown conversion
 
 ### Authentication & Onboarding
 - `app/dashboard/page.tsx` - Shows sign-in prompt when not authenticated (removed redirect to /api/auth/signin)
@@ -288,6 +304,7 @@ ADMIN_EMAIL=your-email@example.com
 4. **Prettier Integration** - Auto-format with repo's Prettier config
 5. **Change Detection** - Show diff of what changed since last sync
 6. **Image Handling** - Full Cloudinary integration for CDN URLs
+7. **File Upload Enhancement** - Add support for more file types (Word, PDF, etc.)
 
 ---
 
@@ -373,8 +390,8 @@ ADMIN_EMAIL=your-email@example.com
 - `app/admin/analytics/page.tsx` - Admin analytics
 - `app/api/admin/stats/route.ts` - Admin stats API
 - `app/api/admin/users/route.ts` - Admin users API
-- `app/converter/page.tsx` - Converter demo page with split-screen preview
-- `app/api/convert-demo/route.ts` - Public API endpoint for demo conversions
+- `app/converter/page.tsx` - Converter demo page with split-screen preview and file upload
+- `app/api/convert-demo/route.ts` - Public API endpoint for demo conversions (supports Google Docs and file uploads)
 - `db/migrations/0002_email_auth_analytics.sql` - SQL migration for email auth and analytics schema changes
 
 ### Files Modified
@@ -489,6 +506,7 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 ### Converter Demo Features
 - **No database storage**: Demo mode doesn't save any data
 - **Split-screen UI**: Visual comparison of original vs converted content
+- **File upload**: Upload HTML, RTF, TXT, DOC, DOCX files from your device
 - **Copy to clipboard**: Users can copy the Markdown output
 - **Sign-in required for download**: Clear CTA to sign in for full features
 - **Public API endpoint**: `/api/convert-demo` for demo conversions
@@ -522,6 +540,7 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 
 ## Testing the Converter Demo (No Sign-In Required)
 
+### Option 1: Convert Google Doc URL
 1. Visit the homepage (`/`)
 2. Click "Start Syncing Free" → redirects to `/converter`
 3. Enter a Google Doc URL or ID in the input field
@@ -530,7 +549,17 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
    - **Left**: Original Google Doc (shows authentication note for private docs)
    - **Right**: Converted Markdown output
 6. Click "Copy Markdown" to copy the output to clipboard
-7. Click "Sign In Now" to sign in and access full features (download, GitHub sync)
+
+### Option 2: Upload File from Device
+1. Visit the `/converter` page
+2. Click on the dashed border area in the "Upload a File" section
+3. Select a file from your device (HTML, RTF, TXT, DOC, or DOCX)
+4. Click "Convert File" button
+5. See the split-screen preview with your converted content
+6. Click "Copy Markdown" to copy the output to clipboard
+
+### Sign In for Full Features
+- Click "Sign In Now" to sign in and access full features (download, GitHub sync)
 
 ## Testing the Sync Flow
 
@@ -562,6 +591,7 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 7. **Missing Alert component** → Created `components/ui/alert.tsx` for error messages in sign-in form
 8. **Missing `mode` column in sync_configs** → Added `mode TEXT DEFAULT 'github'` column to `sync_configs` table (required by dashboard page query). Run `npm run db:push` to apply. Migration file: `db/migrations/0003_fix_schema_mismatch.sql`
 9. **Sessions table primary key conflict** → Dropped and recreated `sessions` table to fix `multiple primary keys for table "sessions" are not allowed` error. Run `DROP TABLE IF EXISTS sessions CASCADE;` then `npm run db:push`
+10. **File upload escaping issue** → Line 211 in `app/api/convert-demo/route.ts` had malformed escaping (`\"\"\"` instead of `'\"'`). Fixed by using single quotes to wrap the double quote character: `.replace(/&quot;/g, '"')`
 
 ## Authentication Flow Changes
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BookOpen, ArrowRight, Download, Loader2, Copy, CheckCircle, Lock } from "lucide-react";
+import { BookOpen, ArrowRight, Download, Loader2, Copy, CheckCircle, Lock, Upload, FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -22,6 +22,8 @@ export default function ConverterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ConversionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Extract Google Doc ID from URL
   const extractDocId = (url: string): string | null => {
@@ -77,11 +79,87 @@ export default function ConverterPage() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file type
+      const validTypes = [
+        "text/html",
+        "application/rtf",
+        "text/plain",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(html|htm|rtf|txt|docx)$/i)) {
+        setError("Please select a valid file (HTML, RTF, TXT, or DOCX)");
+        toast.error("Invalid file type");
+        return;
+      }
+
+      // Warn about legacy .doc files
+      if (file.name.toLowerCase().endsWith(".doc") && !file.name.toLowerCase().endsWith(".docx")) {
+        setError("Legacy .doc format not supported. Please save as .docx.");
+        toast.error("Legacy .doc format not supported");
+        return;
+      }
+
+      setSelectedFile(file);
+      setError(null);
+      toast.success(`Selected: ${file.name}`);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) {
+      setError("Please select a file first");
+      return;
+    }
+
+    setError(null);
+    setResult(null);
+    setIsLoading(true);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      const response = await fetch("/api/convert-demo", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Conversion failed");
+      }
+
+      setResult({
+        title: data.title || selectedFile.name,
+        content: data.content,
+        images: data.images?.length || 0,
+        tables: data.tables?.length || 0,
+        headings: data.headings?.length || 0,
+      });
+
+      toast.success("Conversion successful!");
+    } catch (err: any) {
+      setError(err.message);
+      toast.error("Conversion failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const copyToClipboard = () => {
     if (result?.content) {
       navigator.clipboard.writeText(result.content);
       toast.success("Copied to clipboard!");
     }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   return (
@@ -110,14 +188,18 @@ export default function ConverterPage() {
           Try Markdly Converter
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          Convert your Google Docs to clean Markdown instantly — no sign-in required.
-          See the conversion in action with our split-screen preview.
+          Convert your documents to clean Markdown instantly.
+          <br className="hidden md:block" />
+          Upload files for free, or sign in for Google Docs.
         </p>
 
         {/* Input Section */}
         <Card className="max-w-2xl mx-auto mb-8">
           <CardHeader>
-            <CardTitle>Enter Google Doc URL</CardTitle>
+            <CardTitle>Convert from Google Doc URL</CardTitle>
+            <CardDescription>
+              Requires Google OAuth sign-in. For public file uploads, see below.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
@@ -150,6 +232,71 @@ export default function ConverterPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+          </CardContent>
+        </Card>
+
+        {/* File Upload Section */}
+        <Card className="max-w-2xl mx-auto mb-8">
+          <CardHeader>
+            <CardTitle>Or Upload a File from Your Device</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".html,.htm,.rtf,.txt,.docx"
+              className="hidden"
+            />
+
+            <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                 onClick={triggerFileInput}>
+              {selectedFile ? (
+                <div className="flex items-center justify-center gap-3 text-primary">
+                  <FileText className="h-8 w-8" />
+                  <span className="font-medium">{selectedFile.name}</span>
+                  <span className="text-sm text-muted-foreground">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <Upload className="h-8 w-8" />
+                  <span className="font-medium">Click to select a file</span>
+                  <span className="text-sm">Supports HTML, RTF, TXT, DOCX</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleFileUpload}
+                disabled={isLoading || !selectedFile}
+                className="flex-1"
+                variant="secondary"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Converting...
+                  </>
+                ) : (
+                  <>
+                    Convert File
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              {selectedFile && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -194,20 +341,20 @@ export default function ConverterPage() {
 
             {/* Split Screen */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Left: Original Google Doc (simulated) */}
+              {/* Left: Original Document (simulated) */}
               <Card className="bg-gradient-to-b from-muted/50 to-background">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <BookOpen className="h-5 w-5 text-primary" />
-                    Google Doc (Original)
+                    Original Document
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="bg-white rounded-lg p-4 shadow-sm border text-left">
-                    <div className="text-sm text-gray-500 mb-2">Preview not available - Google Doc requires authentication</div>
+                    <div className="text-sm text-gray-500 mb-2">Preview not available</div>
                     <div className="text-sm text-gray-400">
-                      The original document is protected by Google OAuth.
-                      Sign in to access the full document preview.
+                      The original document content is protected or not accessible in demo mode.
+                      Sign in to access full document preview.
                     </div>
                   </div>
                 </CardContent>
@@ -257,7 +404,7 @@ export default function ConverterPage() {
       {/* Footer */}
       <footer className="border-t border-border/50 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© 2025 Markdly. The fastest way to convert Google Docs to Markdown.</p>
+          <p>© 2025 Markdly. The fastest way to convert documents to Markdown.</p>
         </div>
       </footer>
     </div>
