@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     // Check if this is a file upload (FormData) or JSON request
     const contentType = request.headers.get("content-type") || "";
 
-    if (contentType.includes("multipart/form-data")) {
+    if (contentType.includes("multipart/form-data") || contentType.includes("form-data")) {
       // Handle file upload
       return await handleFileUpload(request);
     } else {
@@ -81,6 +81,7 @@ async function handleGoogleDocConversion(request: NextRequest) {
     images: result.images,
     headings: result.headings,
     tables: result.tables,
+    sourceType: "google-doc",
   });
 }
 
@@ -100,26 +101,36 @@ async function handleFileUpload(request: NextRequest) {
   }
 
   // Read the file content
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const text = buffer.toString("utf-8");
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
 
   // Convert based on file type
   const fileName = file.name.toLowerCase();
   let markdown: string;
+  let originalContent: string;
   let title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
 
   if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
+    const text = buffer.toString("utf-8");
+    originalContent = text;
     markdown = convertHtmlToMarkdown(text);
   } else if (fileName.endsWith(".txt")) {
+    const text = buffer.toString("utf-8");
+    originalContent = text;
     markdown = convertTxtToMarkdown(text);
   } else if (fileName.endsWith(".rtf")) {
+    const text = buffer.toString("utf-8");
+    originalContent = text;
     markdown = convertRtfToMarkdown(text);
   } else if (fileName.endsWith(".docx")) {
     // For DOCX, use mammoth.js to convert to HTML first, then to Markdown
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.convertToHtml({ arrayBuffer });
-    const html = result.value; // The HTML content
+    const htmlResult = await mammoth.convertToHtml({ buffer });
+    const html = htmlResult.value; // The HTML content
     markdown = convertHtmlToMarkdown(html);
+
+    // Also extract raw text for the original content preview
+    const textResult = await mammoth.extractRawText({ buffer });
+    originalContent = textResult.value; // Raw text without HTML tags
   } else if (fileName.endsWith(".doc")) {
     // For legacy .doc files, we can't directly convert with mammoth
     // Users should save as .docx or export as HTML first
@@ -146,6 +157,8 @@ async function handleFileUpload(request: NextRequest) {
     images,
     headings,
     tables,
+    sourceType: "file-upload",
+    originalContent,
   });
 }
 

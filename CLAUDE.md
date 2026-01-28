@@ -100,6 +100,25 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Converter page updates**: Explicit labels showing "Requires Google OAuth sign-in" for Google Docs section
 - **Reduced user confusion**: Sets proper expectations before users try the converter
 
+### 11. **Enhanced Converter Preview & Bug Fixes** ✅
+- **Fixed DOCX binary display issue**: Original file preview now shows extracted text (not raw ZIP binary data)
+  - Uses `mammoth.extractRawText()` for clean text preview of DOCX files
+  - HTML/RTF/TXT files show original content directly
+- **Split-screen preview improvements**:
+  - **Left side**: Shows original file content (for uploads) or "Preview not available" placeholder (for Google Docs)
+  - **Right side**: Toggle between "Markdown" (raw code) and "Preview" (rendered HTML) views
+- **Markdown preview renderer**: Converts markdown to styled HTML with:
+  - Headings (h1-h6)
+  - Bold, italic, strikethrough
+  - Inline code and code blocks with syntax highlighting
+  - Links and images
+  - Blockquotes
+  - Ordered and unordered lists
+- **Bug fixes**:
+  - `CardDescription` import fix for converter page
+  - Mammoth DOCX conversion using `buffer` instead of `arrayBuffer`
+  - FormData content-type detection for file uploads
+
 ---
 
 ## Competitive Advantage Features
@@ -155,6 +174,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 21. **✅ File Upload for Converter** - Upload HTML, RTF, TXT, DOCX files from device
 22. **✅ DOCX to Markdown** - High-quality conversion using mammoth.js library (preserves headings, tables, formatting)
 23. **✅ Format Documentation** - Homepage "Supported Formats" section with OAuth transparency for Google Docs
+24. **✅ Enhanced Preview** - Toggle between raw Markdown and rendered HTML preview
+25. **✅ Fixed DOCX Preview** - Shows extracted text instead of binary data
 
 ---
 
@@ -237,12 +258,12 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `app/api/convert-and-download/route.ts` - Convert Google Doc to Markdown and download directly
 
 ### Web-Based Converter Demo (No Sign-In Required)
-- `app/converter/page.tsx` - Converter demo page with split-screen preview (Google Doc vs Markdown) + File upload support (HTML, RTF, TXT, DOCX). Updated with OAuth requirement notice for Google Docs
-- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs and uploaded files without authentication. Uses `mammoth.js` for high-quality DOCX conversion. **Note**: Line 211 uses single quotes to avoid escaping issues: `.replace(/&quot;/g, '"')`
+- `app/converter/page.tsx` - Converter demo page with split-screen preview (Google Doc vs Markdown) + File upload support (HTML, RTF, TXT, DOCX). Updated with OAuth requirement notice for Google Docs. **New**: Toggle between "Markdown" (raw code) and "Preview" (rendered HTML) views. Fixed to show extracted text for DOCX files instead of binary data.
+- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs and uploaded files without authentication. Uses `mammoth.js` for high-quality DOCX conversion. **Fixes**: DOCX conversion using `buffer` instead of `arrayBuffer`. Returns `sourceType` and `originalContent` (extracted text for DOCX) for proper preview display.
 - `app/page.tsx` - Added "Supported Formats" section with OAuth transparency notice for Google Docs
 
 ### Dependencies
-- `mammoth` - Added for high-quality DOCX to HTML/Markdown conversion
+- `mammoth` - Added for high-quality DOCX to HTML/Markdown conversion (with raw text extraction)
 
 ### Authentication & Onboarding
 - `app/dashboard/page.tsx` - Shows sign-in prompt when not authenticated (removed redirect to /api/auth/signin)
