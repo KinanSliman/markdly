@@ -5,8 +5,10 @@
  * It provides better maintainability, testability, and performance.
  */
 
-import { createDefaultPipeline, PipelineOutput } from './pipeline';
+import { createDefaultPipeline, PipelineOutput, createFilePipeline } from './pipeline';
 import { GoogleDocContent, ConversionWarning } from './converter';
+import type { ConversionCacheManager } from '@/lib/cache';
+import { createConversionCache } from '@/lib/cache';
 
 /**
  * Converts a Google Doc to Markdown using the new pipeline architecture
@@ -122,6 +124,62 @@ export function getConversionMetrics(result: PipelineOutput) {
 }
 
 /**
+ * Converts file content to Markdown using the pipeline architecture
+ *
+ * @param content - File content (HTML, TXT, RTF, or DOCX base64)
+ * @param fileType - Type of file
+ * @param cache - Optional cache manager for caching results
+ * @param options - Additional conversion options
+ * @returns Promise<GoogleDocContent> - Converted content with metadata
+ */
+export async function convertFileToMarkdownWithPipeline(
+  content: string,
+  fileType: 'html' | 'txt' | 'rtf' | 'docx',
+  cache?: ConversionCacheManager,
+  options?: Record<string, any>
+): Promise<GoogleDocContent> {
+  try {
+    // Use file pipeline (no Google Docs API)
+    const pipeline = createFilePipeline();
+
+    // Add cache to pipeline config if provided
+    if (cache) {
+      (pipeline as any).cache = cache;
+    }
+
+    const result: PipelineOutput = await pipeline.execute({
+      content,
+      fileType,
+      options,
+    });
+
+    // Convert PipelineOutput to GoogleDocContent
+    const images: Array<{ url: string; alt: string }> = [];
+    const headings: Array<{ text: string; level: number }> = [];
+    const tables: Array<{ rows: string[][] }> = [];
+
+    // Extract headings from metadata
+    if (result.metadata.headingCount > 0) {
+      // Note: We'd need to store actual headings in metadata
+      // For now, we'll just return empty arrays
+    }
+
+    return {
+      title: result.metadata.title,
+      content: result.content,
+      images,
+      headings,
+      tables,
+      warnings: result.warnings,
+      metrics: result.metrics,
+    };
+  } catch (error: any) {
+    console.error("Error converting file:", error);
+    throw new Error(`Failed to convert file: ${error.message}`);
+  }
+}
+
+/**
  * Validates a Google Doc ID
  *
  * @param docId - Google Doc ID or URL to validate
@@ -156,4 +214,15 @@ export function extractDocIdFromUrl(url: string): string {
     throw new Error('Invalid Google Doc URL format');
   }
   return match[1];
+}
+
+/**
+ * Create a cache manager for conversions (auto-detects Redis or in-memory)
+ */
+export async function createConversionCacheManager(): Promise<ConversionCacheManager> {
+  return await createConversionCache({
+    maxSize: 1000,
+    defaultTTL: 3600000, // 1 hour
+    enableMetrics: true,
+  });
 }

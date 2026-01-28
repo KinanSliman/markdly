@@ -23,9 +23,11 @@ export {
 export {
   convertGoogleDocToMarkdownWithPipeline,
   convertGoogleDocToMarkdownDemo,
+  convertFileToMarkdownWithPipeline,
   getConversionMetrics,
   validateGoogleDocId,
   extractDocIdFromUrl,
+  createConversionCacheManager,
 } from './pipeline-converter';
 
 // Front matter utilities

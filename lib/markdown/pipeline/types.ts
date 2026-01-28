@@ -12,16 +12,22 @@ import { ConversionWarning } from '../converter';
 // ============================================================================
 
 export interface PipelineInput {
-  /** Google Doc ID or URL */
-  docId: string;
-  /** Google OAuth access token */
-  token: string;
+  /** Google Doc ID or URL (for Google Docs) */
+  docId?: string;
+  /** Google OAuth access token (for Google Docs) */
+  token?: string;
   /** Whether token is an access token (true) or refresh token (false) */
   isAccessToken?: boolean;
   /** Cloudinary folder for image uploads */
   cloudinaryFolder?: string;
   /** Optional: pre-fetched document content (for testing/optimization) */
   documentContent?: any;
+  /** File content for file-based conversion */
+  content?: string;
+  /** File type for file-based conversion */
+  fileType?: 'html' | 'txt' | 'rtf' | 'docx';
+  /** Additional conversion options */
+  options?: Record<string, any>;
 }
 
 export interface PipelineOutput {
@@ -69,8 +75,8 @@ export interface PipelineMetrics {
   formatTime: number;
   /** Time spent validating output */
   validateTime: number;
-  /** Cache hit/miss status */
-  cacheHit?: boolean;
+  /** Whether result was retrieved from cache */
+  cached?: boolean;
 }
 
 // ============================================================================
@@ -153,6 +159,10 @@ export interface PipelineConfig {
     maxAttempts: number;
     backoffMs: number;
   };
+  /** Cache manager for storing conversion results */
+  cache?: import('@/lib/cache').ConversionCacheManager;
+  /** Cache TTL in milliseconds (default: 3600000 = 1 hour) */
+  cacheTTL?: number;
 }
 
 // ============================================================================

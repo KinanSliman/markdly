@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convertGoogleDocToMarkdown } from "@/lib/markdown/converter";
+import { convertGoogleDocToMarkdown, convertFileToMarkdownWithPipeline } from "@/lib/markdown";
+import { createConversionCacheManager, hashString } from "@/lib/cache";
 import * as mammoth from "mammoth";
+
+// Initialize cache manager (singleton)
+let cacheManager: any = null;
+
+async function getCacheManager() {
+  if (!cacheManager) {
+    cacheManager = await createConversionCacheManager();
+  }
+  return cacheManager;
+}
 
 /**
  * POST /api/convert-demo
@@ -109,6 +120,8 @@ async function handleFileUpload(request: NextRequest) {
   let markdown: string;
   let originalContent: string;
   let title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+  let fileType: 'html' | 'txt' | 'rtf' | 'docx' = 'html';
+  let contentForCache: string;
 
   if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
     const text = buffer.toString("utf-8");
@@ -118,6 +131,8 @@ async function handleFileUpload(request: NextRequest) {
       .replace(/[ \t]+$/gm, "")
       .trim();
     markdown = convertHtmlToMarkdown(text);
+    fileType = 'html';
+    contentForCache = text;
   } else if (fileName.endsWith(".txt")) {
     const text = buffer.toString("utf-8");
     // Clean up excessive newlines
@@ -126,6 +141,8 @@ async function handleFileUpload(request: NextRequest) {
       .replace(/[ \t]+$/gm, "")
       .trim();
     markdown = convertTxtToMarkdown(text);
+    fileType = 'txt';
+    contentForCache = text;
   } else if (fileName.endsWith(".rtf")) {
     const text = buffer.toString("utf-8");
     // Clean up excessive newlines
@@ -134,6 +151,8 @@ async function handleFileUpload(request: NextRequest) {
       .replace(/[ \t]+$/gm, "")
       .trim();
     markdown = convertRtfToMarkdown(text);
+    fileType = 'rtf';
+    contentForCache = text;
   } else if (fileName.endsWith(".docx")) {
     // For DOCX, use mammoth.js to convert to HTML first, then to Markdown
     const htmlResult = await mammoth.convertToHtml({ buffer });
@@ -147,6 +166,9 @@ async function handleFileUpload(request: NextRequest) {
       .replace(/\n{4,}/g, "\n\n") // Max 2 newlines
       .replace(/[ \t]+$/gm, "") // Remove trailing spaces/tabs
       .trim(); // Trim leading/trailing whitespace
+
+    fileType = 'docx';
+    contentForCache = html; // Cache the HTML version
   } else if (fileName.endsWith(".doc")) {
     // For legacy .doc files, we can't directly convert with mammoth
     // Users should save as .docx or export as HTML first
@@ -166,6 +188,57 @@ async function handleFileUpload(request: NextRequest) {
   const tables = extractTables(markdown);
   const images = extractImages(markdown);
 
+  // Try to cache the result using the new pipeline-based converter
+  try {
+    const cache = await getCacheManager();
+    const cacheKey = hashString(contentForCache + fileType);
+
+    // Check if already cached
+    const cached = await cache.getFileConversion(contentForCache, fileType);
+
+    if (cached) {
+      console.log(`Cache hit for ${fileName}`);
+      return NextResponse.json({
+        success: true,
+        title,
+        content: markdown,
+        images,
+        headings,
+        tables,
+        sourceType: "file-upload",
+        originalContent,
+        cached: true,
+        cacheKey,
+      });
+    }
+
+    // Store in cache for future requests
+    await cache.setFileConversion(contentForCache, fileType, {
+      content: markdown,
+      metadata: {
+        title,
+        headings,
+        tables: tables.length,
+        images: images.length,
+        warnings: [],
+      },
+      warnings: [],
+      metrics: {
+        totalTime: 0,
+        stages: {},
+        cached: false,
+      },
+      cacheInfo: {
+        cachedAt: Date.now(),
+        ttl: 3600000, // 1 hour
+        key: cacheKey,
+      },
+    }, 3600000);
+  } catch (cacheError) {
+    // Don't fail the request if caching fails
+    console.warn("Cache error:", cacheError);
+  }
+
   return NextResponse.json({
     success: true,
     title,
@@ -175,6 +248,7 @@ async function handleFileUpload(request: NextRequest) {
     tables,
     sourceType: "file-upload",
     originalContent,
+    cached: false,
   });
 }
 

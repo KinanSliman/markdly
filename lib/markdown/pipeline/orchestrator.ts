@@ -2,7 +2,7 @@
  * Pipeline Orchestrator
  *
  * Coordinates the execution of pipeline stages.
- * Handles stage execution, error handling, and performance tracking.
+ * Handles stage execution, error handling, performance tracking, and caching.
  */
 
 import {
@@ -16,14 +16,18 @@ import {
   PipelineMetrics,
   PipelineMetadata,
 } from './types';
+import type { ConversionCacheManager } from '@/lib/cache';
+import { generateFileCacheKey } from '@/lib/cache';
 
 export class PipelineOrchestrator {
   private stages: PipelineStage[];
   private config: PipelineConfig;
+  private cache?: ConversionCacheManager;
 
   constructor(config: PipelineConfig) {
     this.stages = config.stages;
     this.config = config;
+    this.cache = config.cache;
   }
 
   /**
@@ -31,6 +35,27 @@ export class PipelineOrchestrator {
    */
   async execute(input: PipelineInput): Promise<PipelineOutput> {
     const startTime = performance.now();
+
+    // Try to get from cache if available
+    if (this.cache && input.content) {
+      const cached = await this.cache.getFileConversion(
+        input.content,
+        input.fileType || 'html',
+        input.options
+      );
+
+      if (cached) {
+        // Return cached result with updated metrics
+        return {
+          ...cached,
+          metrics: {
+            ...cached.metrics,
+            cached: true,
+            totalTime: performance.now() - startTime,
+          },
+        };
+      }
+    }
 
     // Initialize context
     const context: PipelineContext = {
@@ -45,6 +70,7 @@ export class PipelineOrchestrator {
         imageUploadTime: 0,
         formatTime: 0,
         validateTime: 0,
+        cached: false,
       },
     };
 
@@ -58,7 +84,34 @@ export class PipelineOrchestrator {
       context.metrics.totalTime = performance.now() - startTime;
 
       // Build output
-      return this.buildOutput(context);
+      const output = this.buildOutput(context);
+
+      // Cache the result if cache is available
+      if (this.cache && input.content) {
+        try {
+          await this.cache.setFileConversion(
+            input.content,
+            input.fileType || 'html',
+            {
+              content: output.content,
+              metadata: output.metadata,
+              warnings: output.warnings,
+              metrics: output.metrics,
+              cacheInfo: {
+                cachedAt: Date.now(),
+                ttl: this.config.cacheTTL || 3600000, // 1 hour default
+                key: generateFileCacheKey(input.content, input.fileType || 'html', input.options),
+              },
+            },
+            this.config.cacheTTL || 3600000
+          );
+        } catch (cacheError) {
+          // Don't fail the request if caching fails
+          console.warn('Failed to cache conversion result:', cacheError);
+        }
+      }
+
+      return output;
     } catch (error: any) {
       // Calculate total time even on error
       context.metrics.totalTime = performance.now() - startTime;
