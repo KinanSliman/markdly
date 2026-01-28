@@ -174,3 +174,29 @@ export const analytics = pgTable("analytics", {
   metadata: jsonb("metadata"), // Event-specific data
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Performance Metrics (tracking conversion, sync, API performance)
+export const performanceMetrics = pgTable("performance_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id),
+  operationType: text("operation_type").notNull(), // 'conversion', 'sync', 'api'
+  operationId: text("operation_id"), // Unique identifier for the operation
+  duration: integer("duration").notNull(), // Duration in milliseconds
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  metrics: jsonb("metrics"), // Detailed metrics (conversion, sync, or API metrics)
+  metadata: jsonb("metadata"), // Additional context
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Performance Alerts (performance degradation alerts)
+export const performanceAlerts = pgTable("performance_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  alertType: text("alert_type").notNull(), // 'slow_conversion', 'high_error_rate', 'low_cache_hit_rate', etc.
+  severity: text("severity").notNull(), // 'info', 'warning', 'critical'
+  message: text("message").notNull(),
+  details: jsonb("details"), // Alert-specific details
+  acknowledged: boolean("acknowledged").default(false),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  triggeredAt: timestamp("triggered_at").notNull().defaultNow(),
+});

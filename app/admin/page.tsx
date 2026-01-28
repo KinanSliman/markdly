@@ -8,7 +8,7 @@ import { db } from "@/lib/database";
 import { users, syncHistory, analytics } from "@/db/schema";
 import { eq, gt, count } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
-import { Users, Activity, CheckCircle2, TrendingUp, ArrowRight } from "lucide-react";
+import { Users, Activity, CheckCircle2, TrendingUp, ArrowRight, Zap } from "lucide-react";
 
 export default async function AdminPage() {
   await requireAdmin();
@@ -112,7 +112,7 @@ export default async function AdminPage() {
           </Card>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Manage Users</CardTitle>
@@ -141,6 +141,24 @@ export default async function AdminPage() {
               <Button asChild className="w-full" variant="outline">
                 <Link href="/admin/analytics">
                   View Analytics
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance</CardTitle>
+              <CardDescription>
+                Monitor system performance and alerts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full" variant="outline">
+                <Link href="/admin/performance">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Performance Dashboard
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>

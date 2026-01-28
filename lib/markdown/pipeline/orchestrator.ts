@@ -18,6 +18,7 @@ import {
 } from './types';
 import type { ConversionCacheManager } from '@/lib/cache';
 import { generateFileCacheKey } from '@/lib/cache';
+import { globalMetricsCollector } from '@/lib/metrics';
 
 export class PipelineOrchestrator {
   private stages: PipelineStage[];
@@ -111,10 +112,38 @@ export class PipelineOrchestrator {
         }
       }
 
+      // Record metrics on success
+      if (this.config.collectMetrics) {
+        this.recordConversionMetrics(output, input);
+      }
+
       return output;
     } catch (error: any) {
       // Calculate total time even on error
       context.metrics.totalTime = performance.now() - startTime;
+
+      // Record failed conversion metrics
+      if (this.config.collectMetrics) {
+        globalMetricsCollector.recordConversion({
+          totalTime: context.metrics.totalTime,
+          fetchTime: context.metrics.fetchTime,
+          parseTime: context.metrics.parseTime,
+          processTime: context.metrics.processTime,
+          imageUploadTime: context.metrics.imageUploadTime,
+          formatTime: context.metrics.formatTime,
+          validateTime: context.metrics.validateTime,
+          cached: false,
+          documentSize: context.markdown?.length || 0,
+          paragraphCount: context.paragraphs?.length || 0,
+          tableCount: context.stageData['process']?.tables?.length || 0,
+          imageCount: context.images?.length || 0,
+          codeBlockCount: (context.contentBlocks || []).filter((b) => b.type === 'code').length,
+        }, {
+          docId: input.docId,
+          error: error.message,
+          stage: error.stage || 'unknown',
+        });
+      }
 
       // Re-throw with context
       if (error instanceof PipelineError) {
@@ -128,6 +157,31 @@ export class PipelineOrchestrator {
         error
       );
     }
+  }
+
+  /**
+   * Record conversion metrics to the metrics collector
+   */
+  private recordConversionMetrics(output: PipelineOutput, input: PipelineInput): void {
+    globalMetricsCollector.recordConversion({
+      totalTime: output.metrics.totalTime,
+      fetchTime: output.metrics.fetchTime,
+      parseTime: output.metrics.parseTime,
+      processTime: output.metrics.processTime,
+      imageUploadTime: output.metrics.imageUploadTime,
+      formatTime: output.metrics.formatTime,
+      validateTime: output.metrics.validateTime,
+      cached: output.metrics.cached || false,
+      documentSize: output.metadata.characterCount,
+      paragraphCount: output.metadata.paragraphCount,
+      tableCount: output.metadata.tableCount,
+      imageCount: output.metadata.imageCount,
+      codeBlockCount: output.metadata.codeBlockCount,
+    }, {
+      docId: input.docId,
+      title: output.metadata.title,
+      fileType: input.fileType,
+    });
   }
 
   /**
