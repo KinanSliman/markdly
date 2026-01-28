@@ -100,24 +100,35 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Converter page updates**: Explicit labels showing "Requires Google OAuth sign-in" for Google Docs section
 - **Reduced user confusion**: Sets proper expectations before users try the converter
 
-### 11. **Enhanced Converter Preview & Bug Fixes** ✅
-- **Fixed DOCX binary display issue**: Original file preview now shows extracted text (not raw ZIP binary data)
-  - Uses `mammoth.extractRawText()` for clean text preview of DOCX files
-  - HTML/RTF/TXT files show original content directly
-- **Split-screen preview improvements**:
-  - **Left side**: Shows original file content (for uploads) or "Preview not available" placeholder (for Google Docs)
-  - **Right side**: Toggle between "Markdown" (raw code) and "Preview" (rendered HTML) views
-- **Markdown preview renderer**: Converts markdown to styled HTML with:
-  - Headings (h1-h6)
-  - Bold, italic, strikethrough
-  - Inline code and code blocks with syntax highlighting
-  - Links and images
-  - Blockquotes
-  - Ordered and unordered lists
+### 11. **Premium VS Code-Quality Markdown Previewer** ✅
+- **Professional markdown rendering** using `remark` + `rehype` ecosystem (same as VS Code, GitHub, Notion)
+- **Full syntax highlighting** for 70+ programming languages via `highlight.js`
+- **GitHub Flavored Markdown (GFM) support**:
+  - Tables with proper styling
+  - Task lists with interactive checkboxes
+  - Strikethrough text
+  - Autolinks
+- **Enhanced preview features**:
+  - **Code blocks**: Syntax highlighting with language detection
+  - **Headings**: Styled with proper hierarchy and anchor links (via `rehype-slug`)
+  - **Blockquotes**: Blue left border with italic styling
+  - **Links**: Blue underlined with hover effects
+  - **Lists**: Properly styled ordered/unordered lists
+  - **Tables**: GitHub-style table borders and header styling
+- **VS Code-style UI**:
+  - Dark theme code editor with traffic light buttons (red/yellow/green)
+  - Tab switching between "Code" and "Preview" modes
+  - File name display with character count
+- **Fixed DOCX binary display issue**: Original file preview shows extracted text (not raw ZIP binary data)
+- **Download button**: Direct markdown file download with proper filename (available without sign-in)
+- **Copy button**: Visual feedback with checkmark animation
 - **Bug fixes**:
   - `CardDescription` import fix for converter page
   - Mammoth DOCX conversion using `buffer` instead of `arrayBuffer`
   - FormData content-type detection for file uploads
+  - **Text alignment**: Fixed centered text to left-aligned for all preview panes
+  - **Excessive newlines**: Cleaned up double/triple newlines from DOCX/Word formatting
+  - **Truncation removed**: Full content displayed without character limits
 
 ---
 
@@ -176,6 +187,12 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 23. **✅ Format Documentation** - Homepage "Supported Formats" section with OAuth transparency for Google Docs
 24. **✅ Enhanced Preview** - Toggle between raw Markdown and rendered HTML preview
 25. **✅ Fixed DOCX Preview** - Shows extracted text instead of binary data
+26. **✅ Premium Markdown Previewer** - VS Code-quality preview with syntax highlighting, GFM tables, task lists, and professional styling
+27. **✅ Download Button** - Direct markdown file download from converter page (no sign-in required)
+28. **✅ Copy Button with Feedback** - Visual checkmark animation when copying markdown
+29. **✅ Left-Aligned Content** - Fixed text alignment issue (was centered, now left-aligned)
+30. **✅ Clean Original Preview** - Removed excessive empty lines from DOCX/Word formatting
+31. **✅ Full Content Display** - Removed 2000 character truncation limit for original and converted content
 
 ---
 
@@ -244,6 +261,84 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 7. Redirected back → Google Docs listed successfully
 ```
 
+## Premium Markdown Previewer Architecture
+
+### Rendering Pipeline (VS Code Quality)
+
+```
+1. Markdown Input
+   ↓
+2. remark-parse → Parse to AST (Abstract Syntax Tree)
+   ↓
+3. remark-gfm → Process GitHub Flavored Markdown
+   - Tables
+   - Task lists (checkboxes)
+   - Strikethrough
+   - Autolinks
+   ↓
+4. remark-rehype → Convert to HTML AST
+   ↓
+5. rehype-highlight → Syntax highlighting for code blocks
+   - Auto-detects 70+ languages
+   - Uses highlight.js with GitHub Dark theme
+   ↓
+6. rehype-slug → Add IDs to headings for anchor links
+   ↓
+7. rehype-raw → Allow raw HTML in markdown
+   ↓
+8. rehype-stringify → Convert to HTML string
+   ↓
+9. Rendered HTML with syntax highlighting
+```
+
+### Key Components
+
+**`components/markdown-preview.tsx`**
+- Uses `unified` processor pipeline
+- Client-side rendering with `useEffect`
+- Loading state during processing
+- Styled with Tailwind + Tailwind Typography (`prose`)
+
+**`app/converter/page.tsx`**
+- VS Code-style dark theme editor for raw markdown
+- Tab switching between "Code" and "Preview" modes
+- Traffic light buttons (red/yellow/green) for authentic VS Code feel
+- File name display with character count
+- Download button for markdown files
+- Copy button with checkmark animation
+
+### Supported Features
+
+| Feature | Syntax | Rendering |
+|---------|--------|-----------|
+| **Headings** | `# Heading 1` | Styled h1-h6 with anchor links |
+| **Bold** | `**bold**` | `<strong>bold</strong>` |
+| **Italic** | `*italic*` | `<em>italic</em>` |
+| **Strikethrough** | `~~strike~~` | `<del>strike</del>` |
+| **Inline Code** | `` `code` `` | `<code>` with background |
+| **Code Blocks** | ```` ```js\n...\n``` ```` | Syntax highlighted `<pre><code>` |
+| **Links** | `[text](url)` | Blue underlined with hover |
+| **Images** | `![alt](url)` | Responsive with max-width |
+| **Blockquotes** | `> quote` | Blue left border, italic |
+| **Unordered Lists** | `- item` | Disc style with proper spacing |
+| **Ordered Lists** | `1. item` | Decimal style with proper spacing |
+| **Tables** | `\| col \|\n\| --- \|\n\| val \|` | GitHub-style borders |
+| **Task Lists** | `- [ ] task` | Interactive checkboxes |
+
+### Performance Notes
+
+- **AST-based parsing**: Much faster and more accurate than regex
+- **Client-side rendering**: No server round-trip needed
+- **Loading state**: Shows "Rendering preview..." during processing
+- **Caching**: Browser caches highlight.js language definitions
+
+### VS Code Theme Colors
+
+- Background: `#1e1e1e`
+- Title bar: `#252526`
+- Text: `#d4d4d4`
+- Traffic lights: Red (`#ff5f56`), Yellow (`#ffbd2e`), Green (`#27c93f`)
+
 ---
 
 ## Files Created/Updated
@@ -258,12 +353,29 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - `app/api/convert-and-download/route.ts` - Convert Google Doc to Markdown and download directly
 
 ### Web-Based Converter Demo (No Sign-In Required)
-- `app/converter/page.tsx` - Converter demo page with split-screen preview (Google Doc vs Markdown) + File upload support (HTML, RTF, TXT, DOCX). Updated with OAuth requirement notice for Google Docs. **New**: Toggle between "Markdown" (raw code) and "Preview" (rendered HTML) views. Fixed to show extracted text for DOCX files instead of binary data.
-- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs and uploaded files without authentication. Uses `mammoth.js` for high-quality DOCX conversion. **Fixes**: DOCX conversion using `buffer` instead of `arrayBuffer`. Returns `sourceType` and `originalContent` (extracted text for DOCX) for proper preview display.
+- `app/converter/page.tsx` - Converter demo page with **premium VS Code-style previewer** (Google Doc vs Markdown) + File upload support (HTML, RTF, TXT, DOCX). Updated with OAuth requirement notice for Google Docs. **New**: Toggle between "Code" (raw markdown) and "Preview" (rendered HTML) views with syntax highlighting. Fixed to show extracted text for DOCX files instead of binary data. Added download button and improved copy button with visual feedback. **Fixes**: Left-aligned all content (was centered), removed truncation for full content display, improved line spacing with `leading-tight`.
+- `app/api/convert-demo/route.ts` - Public API endpoint for converting Google Docs and uploaded files without authentication. Uses `mammoth.js` for high-quality DOCX conversion. **Fixes**: DOCX conversion using `buffer` instead of `arrayBuffer`. Returns `sourceType` and `originalContent` (extracted text for DOCX) for proper preview display. **New**: Cleans up excessive newlines from Word/Google Docs formatting (replaces `\n{4,}` with `\n\n`).
+- `components/markdown-preview.tsx` - **NEW**: Premium markdown preview component using `remark` + `rehype` ecosystem with full syntax highlighting, GFM tables, task lists, and GitHub-style rendering. **Fixes**: Added `text-left` class for proper left alignment.
 - `app/page.tsx` - Added "Supported Formats" section with OAuth transparency notice for Google Docs
+
+### CSS / Styling
+- `highlight.js/styles/github-dark.css` - Imported in `components/markdown-preview.tsx` for VS Code dark theme syntax highlighting
 
 ### Dependencies
 - `mammoth` - Added for high-quality DOCX to HTML/Markdown conversion (with raw text extraction)
+- `remark` + `rehype` ecosystem - Added for premium markdown rendering with syntax highlighting:
+  - `remark` - Parse markdown to AST
+  - `remark-gfm` - GitHub Flavored Markdown (tables, strikethrough, task lists)
+  - `remark-rehype` - Convert markdown AST to HTML AST
+  - `rehype-highlight` - Syntax highlighting for code blocks (70+ languages)
+  - `rehype-raw` - Allow raw HTML in markdown
+  - `rehype-stringify` - Convert AST back to HTML string
+  - `rehype-slug` - Add IDs to headings for anchor links
+  - `unified` - Core processor for the remark/rehype pipeline
+  - `highlight.js` - Syntax highlighting engine
+
+### CSS Additions (highlight.js styles)
+- `highlight.js/styles/github-dark.css` - VS Code dark theme for syntax highlighting in code blocks
 
 ### Authentication & Onboarding
 - `app/dashboard/page.tsx` - Shows sign-in prompt when not authenticated (removed redirect to /api/auth/signin)
@@ -402,6 +514,7 @@ ADMIN_EMAIL=your-email@example.com
 - `components/forms/email-signup-form.tsx` - Email signup form
 - `components/forms/email-signin-form.tsx` - Email signin form
 - `components/ui/alert.tsx` - Alert component for error messages
+- `components/markdown-preview.tsx` - Premium markdown preview component with syntax highlighting
 - `app/api/auth/signup/route.ts` - Signup API endpoint
 - `app/api/auth/verify-email/route.ts` - Email verification API
 - `app/auth/signup/page.tsx` - Signup page
@@ -527,10 +640,13 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 ### Converter Demo Features
 - **No database storage**: Demo mode doesn't save any data
 - **Split-screen UI**: Visual comparison of original vs converted content
+- **VS Code-style previewer**: Premium dark theme with syntax highlighting
 - **File upload**: Upload HTML, RTF, TXT, DOC, DOCX files from your device
-- **Copy to clipboard**: Users can copy the Markdown output
+- **Copy to clipboard**: Users can copy the Markdown output with visual feedback
+- **Download button**: Direct markdown file download (filename based on document title)
 - **Sign-in required for download**: Clear CTA to sign in for full features
 - **Public API endpoint**: `/api/convert-demo` for demo conversions
+- **Preview modes**: Toggle between "Code" (raw markdown) and "Preview" (rendered HTML)
 
 ### New User Onboarding (OAuth - Deferred)
 1. User lands on homepage (`/`)
@@ -568,8 +684,10 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 4. Click "Convert" button
 5. See the split-screen preview:
    - **Left**: Original Google Doc (shows authentication note for private docs)
-   - **Right**: Converted Markdown output
-6. Click "Copy Markdown" to copy the output to clipboard
+   - **Right**: Converted Markdown output with VS Code-style preview
+6. Toggle between "Code" and "Preview" tabs to see raw markdown or rendered HTML
+7. Click "Copy" to copy the output to clipboard (shows checkmark confirmation)
+8. Click "Download" to save the markdown file to your device
 
 ### Option 2: Upload File from Device
 1. Visit the `/converter` page
@@ -577,7 +695,18 @@ ALTER TABLE sync_history ADD COLUMN IF NOT EXISTS file_path TEXT;
 3. Select a file from your device (HTML, RTF, TXT, DOC, or DOCX)
 4. Click "Convert File" button
 5. See the split-screen preview with your converted content
-6. Click "Copy Markdown" to copy the output to clipboard
+6. Toggle between "Code" and "Preview" tabs
+7. Click "Copy" to copy the output to clipboard
+8. Click "Download" to save the markdown file
+
+### Premium Preview Features
+- **Syntax Highlighting**: 70+ programming languages with GitHub Dark theme
+- **Tables**: Properly styled GitHub-style tables
+- **Task Lists**: Interactive checkboxes for markdown task lists
+- **Code Blocks**: Language detection and syntax highlighting
+- **Headings**: Styled with anchor links (clickable)
+- **Blockquotes**: Blue left border with italic styling
+- **Links**: Blue underlined with hover effects
 
 ### Sign In for Full Features
 - Click "Sign In Now" to sign in and access full features (download, GitHub sync)
@@ -678,3 +807,21 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token
 **Your main enemy is scope, not competition.**
 
 Build the ruthlessly cut MVP first. Validate. Then expand.
+
+## Recent Fixes (Converter Page)
+
+### 1. Text Alignment Issue
+- **Problem**: Original file display, markdown code, and preview were centered
+- **Fix**: Added `text-left` class to all content areas in `app/converter/page.tsx` and `components/markdown-preview.tsx`
+
+### 2. Excessive Newlines in Original Preview
+- **Problem**: DOCX files from Google Docs/Word had double/triple newlines between paragraphs
+- **Fix**: Added cleanup in `app/api/convert-demo/route.ts` to replace `\n{4,}` with `\n\n` for all file types (HTML, TXT, RTF, DOCX)
+
+### 3. Content Truncation
+- **Problem**: Original and converted content was limited to 2000 characters with "... (truncated)" suffix
+- **Fix**: Removed truncation to show full content with scrollable preview areas
+
+### 4. Download Button Enhancement
+- **Problem**: Download button was only shown after signing in
+- **Fix**: Added download button to sign-in prompt section so users can download converted markdown without signing in

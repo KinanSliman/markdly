@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BookOpen, ArrowRight, Download, Loader2, Copy, CheckCircle, Lock, Upload, FileText } from "lucide-react";
+import { BookOpen, ArrowRight, Download, Loader2, Copy, CheckCircle, Lock, Upload, FileText, Check } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { MarkdownPreview } from "@/components/markdown-preview";
 
 interface ConversionResult {
   title: string;
@@ -27,6 +28,7 @@ export default function ConverterPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [viewMode, setViewMode] = useState<"markdown" | "preview">("markdown");
+  const [copied, setCopied] = useState(false);
 
   // Extract Google Doc ID from URL
   const extractDocId = (url: string): string | null => {
@@ -161,6 +163,8 @@ export default function ConverterPage() {
   const copyToClipboard = () => {
     if (result?.content) {
       navigator.clipboard.writeText(result.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
       toast.success("Copied to clipboard!");
     }
   };
@@ -169,71 +173,17 @@ export default function ConverterPage() {
     fileInputRef.current?.click();
   };
 
-  // Render markdown as HTML preview
-  const renderMarkdownPreview = (markdown: string) => {
-    // Simple markdown to HTML conversion for preview
-    let html = markdown;
+  const downloadMarkdown = () => {
+    if (!result?.content) return;
 
-    // Convert headings
-    html = html.replace(/^###### (.+)$/gm, "<h6>$1</h6>");
-    html = html.replace(/^##### (.+)$/gm, "<h5>$1</h5>");
-    html = html.replace(/^#### (.+)$/gm, "<h4>$1</h4>");
-    html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>");
-    html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>");
-    html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>");
-
-    // Convert bold
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-
-    // Convert italic
-    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-    // Convert strikethrough
-    html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
-
-    // Convert inline code
-    html = html.replace(/`(.+?)`/g, "<code class=\"bg-gray-100 px-1 py-0.5 rounded text-sm font-mono\">$1</code>");
-
-    // Convert code blocks
-    html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-      return `<pre class="bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto my-2"><code class="text-sm font-mono">${escapeHtml(code)}</code></pre>`;
-    });
-
-    // Convert links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:underline">$1</a>');
-
-    // Convert images
-    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded my-2" />');
-
-    // Convert blockquotes
-    html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-2">$1</blockquote>');
-
-    // Convert unordered lists
-    html = html.replace(/^- (.+)$/gm, "<li>$1</li>");
-    html = html.replace(/(<li>.*<\/li>)/s, "<ul class=\"list-disc list-inside my-2\">$1</ul>");
-
-    // Convert ordered lists
-    html = html.replace(/^\d+\. (.+)$/gm, "<li>$1</li>");
-    html = html.replace(/(<li>.*<\/li>)/s, "<ol class=\"list-decimal list-inside my-2\">$1</ol>");
-
-    // Convert paragraphs (double newlines)
-    html = html.split(/\n\n+/).map(para => {
-      if (para.match(/^#{1,6}/) || para.match(/^- /) || para.match(/^\d+\. /) || para.match(/^>/) || para.match(/^```/)) {
-        return para;
-      }
-      return `<p>${para.replace(/\n/g, "<br/>")}</p>`;
-    }).join("\n");
-
-    // Clean up extra line breaks
-    html = html.replace(/\n{2,}/g, "\n");
-
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-  };
-
-  const escapeHtml = (text: string) => {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+    const blob = new Blob([result.content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${result.title.replace(/\s+/g, "_")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Download started!");
   };
 
   return (
@@ -380,13 +330,27 @@ export default function ConverterPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">{result.title}</h2>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={copyToClipboard}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Markdown
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyToClipboard}
+                  className="gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-green-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </>
+                  )}
                 </Button>
-                <Button size="sm" disabled>
-                  <Lock className="mr-2 h-4 w-4" />
-                  Sign In to Download
+                <Button size="sm" onClick={downloadMarkdown} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Download
                 </Button>
               </div>
             </div>
@@ -413,23 +377,31 @@ export default function ConverterPage() {
               </span>
             </div>
 
-            {/* Split Screen */}
+            {/* Split Screen - VS Code Style */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Left: Original Document */}
-              <Card className="bg-gradient-to-b from-muted/50 to-background">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
+              <Card className="bg-gradient-to-b from-muted/50 to-background overflow-hidden">
+                <CardHeader className="pb-2 bg-slate-900 text-slate-100 px-4 py-2">
+                  <div className="flex items-center gap-3">
                     <BookOpen className="h-5 w-5 text-primary" />
-                    {result.sourceType === "file-upload" ? "Original File" : "Original Document"}
-                  </CardTitle>
+                    <span className="font-medium">
+                      {result.sourceType === "file-upload" ? "Original File" : "Original Document"}
+                    </span>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   {result.sourceType === "file-upload" && result.originalContent ? (
-                    <div className="bg-white rounded-lg p-4 shadow-sm border text-left overflow-auto max-h-96">
-                      <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
-                        {result.originalContent.length > 2000
-                          ? result.originalContent.substring(0, 2000) + "\n\n... (truncated)"
-                          : result.originalContent}
+                    <div className="bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm text-left">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-[#252526] border-b border-[#3c3c3c]">
+                        <div className="flex gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <span className="text-xs text-slate-400 ml-2">Text Preview</span>
+                      </div>
+                      <pre className="p-4 overflow-auto max-h-[500px] whitespace-pre-wrap break-words text-left leading-tight">
+                        {result.originalContent}
                       </pre>
                     </div>
                   ) : (
@@ -444,48 +416,60 @@ export default function ConverterPage() {
                 </CardContent>
               </Card>
 
-              {/* Right: Converted Markdown */}
-              <Card className="bg-gradient-to-b from-muted/50 to-background">
-                <CardHeader className="pb-2">
+              {/* Right: Converted Markdown - VS Code Style */}
+              <Card className="bg-gradient-to-b from-muted/50 to-background overflow-hidden">
+                <CardHeader className="pb-2 bg-slate-900 text-slate-100 px-4 py-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <svg className="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
                       </svg>
-                      Converted Markdown
-                    </CardTitle>
-                    <div className="flex gap-2">
+                      <span className="font-medium">converted.md</span>
+                      <span className="text-xs text-slate-400">• {result.content.length} chars</span>
+                    </div>
+
+                    {/* VS Code-style Tabs */}
+                    <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
                       <Button
                         size="sm"
-                        variant={viewMode === "markdown" ? "default" : "outline"}
+                        variant={viewMode === "markdown" ? "secondary" : "ghost"}
                         onClick={() => setViewMode("markdown")}
+                        className="h-7 px-3 text-xs"
                       >
-                        Markdown
+                        Code
                       </Button>
                       <Button
                         size="sm"
-                        variant={viewMode === "preview" ? "default" : "outline"}
+                        variant={viewMode === "preview" ? "secondary" : "ghost"}
                         onClick={() => setViewMode("preview")}
+                        className="h-7 px-3 text-xs"
                       >
                         Preview
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+
+                <CardContent className="p-0">
                   {viewMode === "markdown" ? (
-                    <div className="bg-gray-900 rounded-lg p-4 text-left overflow-auto max-h-96">
-                      <pre className="text-sm text-gray-100 whitespace-pre-wrap font-mono">
-                        {result.content.length > 2000
-                          ? result.content.substring(0, 2000) + "\n\n... (truncated)"
-                          : result.content}
+                    // VS Code-style code editor
+                    <div className="bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm text-left">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-[#252526] border-b border-[#3c3c3c]">
+                        <div className="flex gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <span className="text-xs text-slate-400 ml-2">Markdown</span>
+                      </div>
+                      <pre className="p-4 overflow-auto max-h-[500px] whitespace-pre-wrap break-words text-left leading-tight">
+                        {result.content}
                       </pre>
                     </div>
                   ) : (
-                    <div className="bg-white rounded-lg p-4 text-left overflow-auto max-h-96 border">
-                      <div className="prose prose-sm max-w-none text-gray-900">
-                        {renderMarkdownPreview(result.content)}
-                      </div>
+                    // Preview mode with syntax highlighting
+                    <div className="bg-white dark:bg-slate-950 p-6 overflow-auto max-h-[500px] text-left">
+                      <MarkdownPreview content={result.content} />
                     </div>
                   )}
                 </CardContent>
@@ -494,12 +478,17 @@ export default function ConverterPage() {
 
             {/* Sign In Prompt */}
             <Card className="max-w-2xl mx-auto mt-6 bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
-              <CardContent className="p-6 text-center">
-                <h3 className="text-xl font-bold mb-2">Ready to download and sync?</h3>
-                <p className="text-muted-foreground mb-4">
-                  Sign in to download your converted Markdown file or sync it directly to GitHub.
-                </p>
-                <Button size="lg" asChild>
+              <CardContent className="p-6 text-center space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  <Button size="lg" onClick={downloadMarkdown} className="gap-2">
+                    <Download className="h-5 w-5" />
+                    Download Markdown
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Or sign in to sync directly to GitHub
+                </div>
+                <Button size="lg" variant="outline" asChild>
                   <Link href="/auth/signin">
                     Sign In Now
                     <ArrowRight className="ml-2 h-4 w-4" />

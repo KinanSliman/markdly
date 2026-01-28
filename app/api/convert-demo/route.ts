@@ -112,15 +112,27 @@ async function handleFileUpload(request: NextRequest) {
 
   if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
     const text = buffer.toString("utf-8");
-    originalContent = text;
+    // Clean up excessive newlines
+    originalContent = text
+      .replace(/\n{4,}/g, "\n\n")
+      .replace(/[ \t]+$/gm, "")
+      .trim();
     markdown = convertHtmlToMarkdown(text);
   } else if (fileName.endsWith(".txt")) {
     const text = buffer.toString("utf-8");
-    originalContent = text;
+    // Clean up excessive newlines
+    originalContent = text
+      .replace(/\n{4,}/g, "\n\n")
+      .replace(/[ \t]+$/gm, "")
+      .trim();
     markdown = convertTxtToMarkdown(text);
   } else if (fileName.endsWith(".rtf")) {
     const text = buffer.toString("utf-8");
-    originalContent = text;
+    // Clean up excessive newlines
+    originalContent = text
+      .replace(/\n{4,}/g, "\n\n")
+      .replace(/[ \t]+$/gm, "")
+      .trim();
     markdown = convertRtfToMarkdown(text);
   } else if (fileName.endsWith(".docx")) {
     // For DOCX, use mammoth.js to convert to HTML first, then to Markdown
@@ -130,7 +142,11 @@ async function handleFileUpload(request: NextRequest) {
 
     // Also extract raw text for the original content preview
     const textResult = await mammoth.extractRawText({ buffer });
-    originalContent = textResult.value; // Raw text without HTML tags
+    // Clean up excessive newlines from Word/Google Docs formatting
+    originalContent = textResult.value
+      .replace(/\n{4,}/g, "\n\n") // Max 2 newlines
+      .replace(/[ \t]+$/gm, "") // Remove trailing spaces/tabs
+      .trim(); // Trim leading/trailing whitespace
   } else if (fileName.endsWith(".doc")) {
     // For legacy .doc files, we can't directly convert with mammoth
     // Users should save as .docx or export as HTML first
