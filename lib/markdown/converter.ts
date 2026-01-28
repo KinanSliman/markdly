@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
+import { createDefaultPipeline, PipelineOutput } from "./pipeline";
 
 // Constants for code block detection
 const MONOSPACE_FONTS = ["Courier New", "Consolas", "Monaco", "monospace", "Courier"];
