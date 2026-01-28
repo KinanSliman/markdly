@@ -2,6 +2,11 @@ import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 
+// Constants for code block detection
+const MONOSPACE_FONTS = ["Courier New", "Consolas", "Monaco", "monospace", "Courier"];
+const SMALL_FONT_SIZE = 10; // Points - threshold for code block detection
+const CODE_INDENTATION = 4; // Minimum spaces for code indentation
+
 // Node.js Buffer for converting blobs to base64
 const Buffer = globalThis.Buffer || require("buffer").Buffer;
 
@@ -14,8 +19,10 @@ interface DocsParagraph {
         bold?: boolean;
         italic?: boolean;
         underline?: boolean;
+        strikethrough?: boolean;
         link?: { url?: string };
         fontSize?: { magnitude?: number; unit?: string };
+        weightedFontFamily?: { fontFamily?: string };
       };
     };
     inlineObjectElement?: {
@@ -29,6 +36,7 @@ interface DocsParagraph {
   paragraphStyle?: {
     namedStyleType?: "NORMAL_TEXT" | "HEADING_1" | "HEADING_2" | "HEADING_3" | "HEADING_4" | "HEADING_5" | "HEADING_6";
     alignment?: "START" | "CENTER" | "END" | "JUSTIFY";
+    direction?: "LEFT_TO_RIGHT" | "RIGHT_TO_LEFT";
   };
 }
 
@@ -74,6 +82,14 @@ export interface GoogleDocContent {
   images: Array<{ url: string; alt: string }>;
   headings: Array<{ text: string; level: number }>;
   tables: Array<{ rows: string[][] }>;
+  warnings: ConversionWarning[];
+}
+
+export interface ConversionWarning {
+  type: "code_block" | "heading" | "table" | "list" | "formatting";
+  message: string;
+  suggestion: string;
+  context?: string;
 }
 
 /**
@@ -113,6 +129,20 @@ export async function convertGoogleDocToMarkdown(
     const images: Array<{ url: string; alt: string }> = [];
     const headings: Array<{ text: string; level: number }> = [];
     const tables: Array<{ rows: string[][] }> = [];
+    const warnings: ConversionWarning[] = [];
+
+    // Track list state for better nesting handling
+    const listState = {
+      currentListId: null as string | null,
+      currentNestingLevel: 0,
+      isNumbered: false,
+    };
+
+    // Track heading hierarchy
+    const headingState = {
+      lastLevel: 0,
+      skippedLevels: 0,
+    };
 
     // Extract inline images for reference
     const inlineImages = extractInlineImages(document);
@@ -120,14 +150,23 @@ export async function convertGoogleDocToMarkdown(
     if (document.body && document.body.content) {
       for (const element of document.body.content) {
         if (element.paragraph) {
-          const paragraphMarkdown = processParagraph(element.paragraph, images, headings, inlineImages);
-          markdown += paragraphMarkdown;
+          const result = processParagraph(
+            element.paragraph,
+            images,
+            headings,
+            inlineImages,
+            listState,
+            headingState,
+            warnings
+          );
+          markdown += result;
         } else if (element.table) {
-          const { markdown: tableMarkdown, tableData } = processTable(element.table);
+          const { markdown: tableMarkdown, tableData, warnings: tableWarnings } = processTable(element.table);
           markdown += tableMarkdown;
           if (tableData.length > 0) {
             tables.push({ rows: tableData });
           }
+          warnings.push(...tableWarnings);
         }
       }
     }
@@ -135,11 +174,12 @@ export async function convertGoogleDocToMarkdown(
     // Process images and upload to Cloudinary if folder is specified
     if (cloudinaryFolder && images.length > 0) {
       // Get the access token for fetching images
-      const accessToken = isAccessToken ? token : await oauth2Client.getAccessToken();
+      const accessTokenResponse = isAccessToken ? { token } : await oauth2Client.getAccessToken();
+      const accessToken = accessTokenResponse.token!;
 
       for (const image of images) {
         try {
-          const cloudinaryUrl = await processGoogleDocImage(image.url, accessToken.token!, cloudinaryFolder);
+          const cloudinaryUrl = await processGoogleDocImage(image.url, accessToken, cloudinaryFolder);
           // Replace the image URL in the markdown
           const escapedUrl = image.url.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
           const imageRegex = new RegExp(`!\\[(.*?)\\]\\(${escapedUrl}\\)`, "g");
@@ -159,6 +199,7 @@ export async function convertGoogleDocToMarkdown(
       images,
       headings,
       tables,
+      warnings,
     };
   } catch (error) {
     console.error("Error fetching Google Doc:", error);
@@ -227,12 +268,16 @@ export async function processGoogleDocImage(
 
 /**
  * Processes a paragraph and converts it to Markdown
+ * Enhanced with Phase 2 improvements: code block detection, list nesting, heading validation
  */
 function processParagraph(
   paragraph: DocsParagraph,
   images: Array<{ url: string; alt: string }>,
   headings: Array<{ text: string; level: number }>,
-  inlineImages: Map<string, string>
+  inlineImages: Map<string, string>,
+  listState: { currentListId: string | null; currentNestingLevel: number; isNumbered: boolean },
+  headingState: { lastLevel: number; skippedLevels: number },
+  warnings: ConversionWarning[]
 ): string {
   const elements = paragraph.elements || [];
   const paragraphStyle = paragraph.paragraphStyle;
@@ -241,6 +286,7 @@ function processParagraph(
   let isHeading = false;
   let headingLevel = 0;
   let isCodeBlock = false;
+  let codeBlockReason: string | null = null;
 
   // Check for heading style
   if (paragraphStyle && paragraphStyle.namedStyleType) {
@@ -251,7 +297,7 @@ function processParagraph(
     }
   }
 
-  // Process text elements
+  // Process text elements with enhanced code block detection
   for (const element of elements) {
     if (element.textRun) {
       const content = element.textRun.content || "";
@@ -259,9 +305,11 @@ function processParagraph(
 
       let formattedText = content;
 
-      // Check for code block (monospace font or specific styling)
-      if (textStyle.fontSize && textStyle.fontSize.magnitude && textStyle.fontSize.magnitude < 10) {
+      // Enhanced code block detection using multiple heuristics
+      const codeBlockDetection = detectCodeBlockInParagraph(textStyle, content, paragraphStyle);
+      if (codeBlockDetection.isCodeBlock && !isCodeBlock) {
         isCodeBlock = true;
+        codeBlockDetection.reason && (codeBlockReason = codeBlockDetection.reason);
       }
 
       // Apply formatting (skip for code blocks)
@@ -271,6 +319,9 @@ function processParagraph(
         }
         if (textStyle.italic) {
           formattedText = `*${formattedText}*`;
+        }
+        if (textStyle.strikethrough) {
+          formattedText = `~~${formattedText}~~`;
         }
         if (textStyle.underline && !textStyle.link) {
           formattedText = `<u>${formattedText}</u>`;
@@ -296,13 +347,44 @@ function processParagraph(
     }
   }
 
-  // Handle bullet points and numbered lists
+  // Handle bullet points and numbered lists with enhanced nesting
   if (paragraph.bullet) {
     const nestingLevel = paragraph.bullet.nestingLevel || 0;
-    const indent = "  ".repeat(nestingLevel);
+    const listId = paragraph.bullet.listId || null;
 
-    // Check if it's a numbered list (Google Docs uses list IDs that start with numbers)
-    const isNumbered = paragraph.bullet.listId && /^\d+/.test(paragraph.bullet.listId);
+    // Check if it's a numbered list
+    const isNumbered = !!(listId && /^\d+/.test(listId));
+
+    // Track list state for better nesting handling
+    const listChanged = listState.currentListId !== listId;
+    const nestingChanged = listState.currentNestingLevel !== nestingLevel;
+    const typeChanged = listState.isNumbered !== isNumbered;
+
+    // Warn about mixed list types in the same list
+    if (listChanged === false && typeChanged) {
+      warnings.push({
+        type: "list",
+        message: "Mixed bullet and numbered list items detected in the same list",
+        suggestion: "Use consistent list types (all bullets or all numbers) for better readability",
+        context: `List ID: ${listId}, Nesting level: ${nestingLevel}`,
+      });
+    }
+
+    // Warn about large nesting level jumps
+    if (nestingLevel > listState.currentNestingLevel + 1) {
+      warnings.push({
+        type: "list",
+        message: `List nesting level jumped from ${listState.currentNestingLevel} to ${nestingLevel}`,
+        suggestion: "Ensure proper list hierarchy - don't skip nesting levels",
+        context: `List ID: ${listId}`,
+      });
+    }
+
+    listState.currentListId = listId;
+    listState.currentNestingLevel = nestingLevel;
+    listState.isNumbered = isNumbered;
+
+    const indent = "  ".repeat(nestingLevel);
 
     if (isNumbered) {
       return `${indent}1. ${text.trim()}\n`;
@@ -312,12 +394,38 @@ function processParagraph(
 
   // Return formatted text
   if (isHeading) {
+    // Validate heading hierarchy - detect skipped levels
+    if (headingState.lastLevel > 0 && headingLevel > headingState.lastLevel + 1) {
+      headingState.skippedLevels++;
+      warnings.push({
+        type: "heading",
+        message: `Heading level skipped from H${headingState.lastLevel} to H${headingLevel}`,
+        suggestion: `Use H${headingState.lastLevel + 1} instead of H${headingLevel} for proper document structure`,
+        context: `Heading: "${text.trim()}"`,
+      });
+    }
+
+    headingState.lastLevel = headingLevel;
+
     const prefix = "#".repeat(headingLevel);
     headings.push({ text: text.trim(), level: headingLevel });
     return `${prefix} ${text.trim()}\n\n`;
   } else if (isCodeBlock) {
-    // Handle code blocks (monospace text)
-    return `\`\`\`\n${text}\n\`\`\`\n\n`;
+    // Handle code blocks with language detection
+    const language = detectCodeLanguage(text);
+    const codeFence = language ? `\`\`\`${language}` : "```";
+
+    // Warn about code blocks without language
+    if (!language && codeBlockReason) {
+      warnings.push({
+        type: "code_block",
+        message: "Code block detected but no language specified",
+        suggestion: "Add a language identifier after the code fence (e.g., ```javascript)",
+        context: `Detection reason: ${codeBlockReason}`,
+      });
+    }
+
+    return `${codeFence}\n${text.trim()}\n\`\`\`\n\n`;
   } else if (text.trim()) {
     return `${text.trim()}\n\n`;
   }
@@ -326,11 +434,166 @@ function processParagraph(
 }
 
 /**
- * Processes a table and converts it to Markdown
+ * Enhanced code block detection using multiple heuristics
+ * Returns whether the paragraph is likely a code block and the detection reason
  */
-function processTable(table: DocsTable): { markdown: string; tableData: string[][] } {
+function detectCodeBlockInParagraph(
+  textStyle: any,
+  content: string,
+  paragraphStyle?: any
+): { isCodeBlock: boolean; reason: string | null } {
+  const trimmedContent = content.trim();
+
+  // Heuristic 1: Small font size (common for code)
+  if (textStyle.fontSize && textStyle.fontSize.magnitude && textStyle.fontSize.magnitude < SMALL_FONT_SIZE) {
+    return { isCodeBlock: true, reason: "small_font_size" };
+  }
+
+  // Heuristic 2: Monospace font family
+  const fontFamily = textStyle.weightedFontFamily?.fontFamily;
+  if (fontFamily && MONOSPACE_FONTS.some(f => fontFamily.toLowerCase().includes(f.toLowerCase()))) {
+    return { isCodeBlock: true, reason: "monospace_font" };
+  }
+
+  // Heuristic 3: Indentation (4+ spaces suggests code)
+  const leadingSpaces = content.match(/^(\s+)/)?.[1]?.length || 0;
+  if (leadingSpaces >= CODE_INDENTATION && trimmedContent.length > 0) {
+    return { isCodeBlock: true, reason: "indentation" };
+  }
+
+  // Heuristic 4: Content patterns (common code syntax)
+  const codePatterns = [
+    /^function\s+\w+/,                    // function foo()
+    /^const\s+\w+/,                       // const foo
+    /^let\s+\w+/,                         // let foo
+    /^var\s+\w+/,                         // var foo
+    /^import\s+/,                         // import ...
+    /^export\s+/,                         // export ...
+    /^from\s+['"]/,                       // from '...'
+    /^class\s+\w+/,                       // class Foo
+    /^return\s+/,                         // return ...
+    /^if\s*\(/,                           // if (
+    /^else\s*{/,                          // else {
+    /^for\s*\(/,                          // for (
+    /^while\s*\(/,                        // while (
+    /^try\s*{/,                           // try {
+    /^catch\s*\(/,                        // catch (
+    /^finally\s*{/,                       // finally {
+    /^async\s+function/,                   // async function
+    /^await\s+/,                          // await ...
+    /^console\./,                         // console.log
+    /^import\s+\{/,                       // import { ...
+    /^export\s+\{/,                       // export { ...
+    /^const\s+\{/,                        // const { ...
+    /^let\s+\{/,                          // let { ...
+    /^const\s+\[/,                        // const [
+    /^let\s+\[/,                          // let [
+    /^#/,                                 // Python/shell comments
+    /^\$/,                                // Shell commands
+    /^\/\//,                              // Line comments
+    /^\{/,                                // Object literal
+    /^\[/,                                // Array literal
+    /^</,                                 // JSX/HTML
+    /^\s*-\s+/,                           // YAML list item
+    /^\s*\w+:\s+/,                        // YAML key-value
+    /^[a-zA-Z_]\w*\s*=/,                  // Variable assignment
+    /^\d+\s*$/,                           // Just a number
+    /^[a-zA-Z_]\w*\s*\(/,                 // Function call
+  ];
+
+  if (trimmedContent && codePatterns.some(pattern => pattern.test(trimmedContent))) {
+    return { isCodeBlock: true, reason: "code_pattern" };
+  }
+
+  return { isCodeBlock: false, reason: null };
+}
+
+/**
+ * Detects the programming language of a code block based on content patterns
+ */
+function detectCodeLanguage(content: string): string | null {
+  const trimmed = content.trim();
+  const lines = trimmed.split("\n");
+
+  // Check for common language patterns
+  const languagePatterns: Record<string, RegExp[]> = {
+    javascript: [
+      /function\s+\w+/, /const\s+\w+/, /let\s+\w+/, /var\s+\w+/, /=>/, /import\s+.*from/,
+      /export\s+/, /console\./, /document\./, /window\./, /Promise/, /async\s+/, /await\s+/,
+    ],
+    typescript: [
+      /interface\s+\w+/, /type\s+\w+/, /enum\s+\w+/, /:\s*\w+/, /<\w+>/, /public\s+/, /private\s+/, /protected\s+/,
+    ],
+    python: [
+      /^def\s+\w+/, /^class\s+\w+/, /^import\s+/, /^from\s+/, /\s+pass\s*$/, /\s+return\s+/, /\s+if\s+.*:/,
+      /\s+for\s+.*:/, /\s+while\s+.*:/, /\s+def\s+/, /\s+class\s+/, /print\(/,
+    ],
+    java: [
+      /public\s+class\s+\w+/, /private\s+class\s+\w+/, /void\s+\w+/, /System\./, /import\s+java\./,
+      /@\w+/, /throws\s+\w+/, /static\s+\w+/, /final\s+\w+/,
+    ],
+    cpp: [
+      /#include\s+</, /#include\s+"/, /std::/, /cout\s*</, /cin\s*>>/, /\w+::\w+/, /->\w+/, /\*\w+/,
+    ],
+    csharp: [
+      /using\s+\w+/, /namespace\s+\w+/, /public\s+class\s+\w+/, /private\s+class\s+\w+/, /void\s+\w+/, /var\s+\w+/, /=>/,
+    ],
+    go: [
+      /package\s+\w+/, /func\s+\w+/, /var\s+\w+/, /:=/, /import\s+\(/, /fmt\./, /type\s+\w+\s+struct/,
+    ],
+    rust: [
+      /fn\s+\w+/, /let\s+mut\s+/, /pub\s+/, /struct\s+\w+/, /enum\s+\w+/, /impl\s+\w+/, /::/, /->\s*\w+/,
+    ],
+    php: [
+      /<\?php/, /function\s+\w+/, /\$\w+/, /echo\s+/, /public\s+/, /private\s+/, /class\s+\w+/,
+    ],
+    ruby: [
+      /def\s+\w+/, /class\s+\w+/, /module\s+\w+/, /end\s*$/, /\|\w+\|/, /\.@\w+/, /require\s+['"]/,
+    ],
+    shell: [
+      /^#!/, /^\$/, /\s+&&\s+/, /\s+\|\|\s+/, /grep\s+/, /ls\s+/, /cd\s+/, /npm\s+/, /yarn\s+/, /docker\s+/,
+    ],
+    json: [
+      /^\{/, /^\[/, /"\w+"\s*:/, /:\s*"/, /:\s*\d+/, /:\s*\[/, /:\s*\{/,
+    ],
+    yaml: [
+      /^\w+\s*:/, /^\s+-\s+\w+/, /^---/, /^(\.\.\.)/, /#\s+/, /:\s*\w+/,
+    ],
+    html: [
+      /<\w+>/, /<\w+\s+/, /</, /\/>/, /<\?xml/, /<!DOCTYPE/, /<html/, /<body/, /<div/,
+    ],
+    css: [
+      /\w+\s*\{/, /\}\s*$/, /\.[\w-]+/, /#[\w-]+/, /\s+!important/, /\s+\d+px/, /\s+\d+rem/,
+    ],
+    sql: [
+      /SELECT\s+.*FROM/i, /INSERT\s+.*INTO/i, /UPDATE\s+.*SET/i, /DELETE\s+.*FROM/i, /CREATE\s+TABLE/i,
+      /FROM\s+\w+/i, /WHERE\s+.*=/i, /JOIN\s+\w+/i, /GROUP\s+BY/i, /ORDER\s+BY/i,
+    ],
+  };
+
+  // Check first few lines for language patterns
+  const linesToCheck = lines.slice(0, 10);
+  const combined = linesToCheck.join("\n");
+
+  for (const [lang, patterns] of Object.entries(languagePatterns)) {
+    for (const pattern of patterns) {
+      if (pattern.test(combined)) {
+        return lang;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Processes a table and converts it to Markdown
+ * Enhanced with Phase 2 improvements: merged cell detection
+ */
+function processTable(table: DocsTable): { markdown: string; tableData: string[][]; warnings: ConversionWarning[] } {
+  const warnings: ConversionWarning[] = [];
   if (!table.tableRows || table.tableRows.length === 0) {
-    return { markdown: "", tableData: [] };
+    return { markdown: "", tableData: [], warnings };
   }
 
   const rows = table.tableRows;
@@ -357,6 +620,16 @@ function processTable(table: DocsTable): { markdown: string; tableData: string[]
         }
       }
 
+      // Check for empty cells (potential merged cells)
+      if (!cellText.trim()) {
+        warnings.push({
+          type: "table",
+          message: "Empty table cell detected",
+          suggestion: "This may be a merged cell. Markdown tables don't support cell merging - consider splitting the cell or using HTML tables",
+          context: `Row ${tableData.length + 1}, Cell ${rowData.length + 1}`,
+        });
+      }
+
       rowData.push(cellText.trim());
     }
 
@@ -365,7 +638,7 @@ function processTable(table: DocsTable): { markdown: string; tableData: string[]
 
   // Build Markdown table
   if (tableData.length === 0) {
-    return { markdown: "", tableData: [] };
+    return { markdown: "", tableData: [], warnings };
   }
 
   const headers = tableData[0];
@@ -379,7 +652,7 @@ function processTable(table: DocsTable): { markdown: string; tableData: string[]
   }
 
   markdown += "\n";
-  return { markdown, tableData };
+  return { markdown, tableData, warnings };
 }
 
 /**

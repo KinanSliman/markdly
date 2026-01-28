@@ -13,7 +13,10 @@
       "Bash(npm run db:push:*)",
       "Bash(xxd:*)",
       "WebSearch",
-      "Bash(unzip:*)"
+      "Bash(unzip:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx next build:*)",
+      "Bash(python3:*)"
     ]
   }
 }
