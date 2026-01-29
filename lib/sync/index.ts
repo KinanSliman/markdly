@@ -1,6 +1,6 @@
 import { db } from "@/lib/database";
 import { syncHistory, documents, syncConfigs, githubConnections, googleConnections } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import {
   convertGoogleDocToMarkdown,
@@ -14,6 +14,8 @@ import { generateFrontMatter, wrapWithFrontMatter, getTemplateByFramework, extra
 import { createGitHubWorkflow } from "@/lib/github";
 import { getGoogleDoc, refreshGoogleAccessToken } from "@/lib/google";
 import { trackSync } from "@/lib/analytics";
+import { hashGoogleDoc } from "@/lib/utils/hashing";
+import { detectDocumentChanges, shouldSkipSync, getChangeDescription } from "@/lib/sync/change-detector";
 
 export interface SyncResult {
   success: boolean;
@@ -22,19 +24,23 @@ export interface SyncResult {
   prNumber?: number;
   filesChanged?: number;
   errorMessage?: string;
+  skipped?: boolean;
+  skipReason?: string;
+  changeType?: string;
 }
 
 export interface SyncOptions {
   docId: string;
   configId: string;
   userId: string;
+  skipUnchanged?: boolean; // Skip sync if content hasn't changed
 }
 
 /**
  * Main sync execution function
  * Orchestrates the entire workflow: Google Doc → Images to Cloudinary → Markdown → GitHub PR
  */
-export async function executeSync({ docId, configId, userId }: SyncOptions): Promise<SyncResult> {
+export async function executeSync({ docId, configId, userId, skipUnchanged = true }: SyncOptions): Promise<SyncResult> {
   const startTime = new Date();
   let syncHistoryId: string | undefined;
 
@@ -164,7 +170,79 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       .replace(/^-|-$/g, "") + ".md";
     const filePath = `${syncConfig.outputPath || "content/"}${fileName}`;
 
-    // 13. Handle sync based on mode
+    // 13. CHANGE DETECTION - Check if content has changed
+    const [existingDoc] = await db
+      .select()
+      .from(documents)
+      .where(eq(documents.googleDocId, docId));
+
+    const changeResult = detectDocumentChanges(
+      existingDoc?.metadata?.content || null,
+      finalContent,
+      existingDoc ? {
+        title: existingDoc.title,
+        contentHash: existingDoc.contentHash,
+        paragraphCount: existingDoc.metadata?.paragraphCount,
+        tableCount: existingDoc.metadata?.tableCount,
+        imageCount: existingDoc.metadata?.imageCount,
+      } : null,
+      {
+        title: googleDoc.name,
+        paragraphCount: converted.metadata?.paragraphCount,
+        tableCount: converted.metadata?.tableCount,
+        imageCount: converted.metadata?.imageCount,
+      },
+      docId
+    );
+
+    const shouldSkip = shouldSkipSync(changeResult, { skipUnchanged });
+
+    if (shouldSkip) {
+      // Content unchanged - skip sync
+      const skipReason = getChangeDescription(changeResult);
+
+      // Update sync history with skipped status
+      await db
+        .update(syncHistory)
+        .set({
+          status: "skipped",
+          docTitle: googleDoc.name,
+          contentHash: changeResult.hashComparison.newHash,
+          changeType: changeResult.summary.changeType,
+          changeReason: skipReason,
+          completedAt: new Date(),
+        })
+        .where(eq(syncHistory.id, syncHistoryId!));
+
+      // Update document tracking with new hash
+      if (existingDoc) {
+        await db
+          .update(documents)
+          .set({
+            title: googleDoc.name,
+            lastSynced: new Date(),
+            contentHash: changeResult.hashComparison.newHash,
+            contentSize: finalContent.length,
+            metadata: {
+              ...existingDoc.metadata,
+              paragraphCount: converted.metadata?.paragraphCount,
+              tableCount: converted.metadata?.tableCount,
+              imageCount: converted.metadata?.imageCount,
+            },
+          })
+          .where(eq(documents.googleDocId, docId));
+      }
+
+      return {
+        success: true,
+        skipped: true,
+        skipReason,
+        changeType: changeResult.summary.changeType,
+        filesChanged: 0,
+      };
+    }
+
+    // 14. Handle sync based on mode (only if content changed)
     let commitSha: string | undefined;
     let prNumber: number | undefined;
     let prUrl: string | undefined;
@@ -181,7 +259,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
         content: finalContent,
         message: `docs: sync "${googleDoc.name}" from Google Docs\n\nAutomated sync from Markdly`,
         title: `docs: sync "${googleDoc.name}"`,
-        body: `This PR was automatically created by Markdly to sync content from Google Docs.\n\n- **Document**: ${googleDoc.name}\n- **Source**: Google Docs\n- **Synced at**: ${new Date().toISOString()}`,
+        body: `This PR was automatically created by Markdly to sync content from Google Docs.\n\n- **Document**: ${googleDoc.name}\n- **Source**: Google Docs\n- **Synced at**: ${new Date().toISOString()}\n- **Change**: ${changeResult.summary.reason}`,
         accessToken: githubConn!.accessToken!,
       });
       commitSha = result.commitSha;
@@ -193,23 +271,23 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
     }
 
     // 15. Update or create document tracking
-    const existingDoc = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.googleDocId, docId));
-
-    if (existingDoc.length > 0) {
+    if (existingDoc) {
       await db
         .update(documents)
         .set({
           title: googleDoc.name,
           lastSynced: new Date(),
           lastModified: new Date(),
+          contentHash: changeResult.hashComparison.newHash,
+          contentSize: finalContent.length,
           metadata: {
             filePath,
             commitSha,
             prNumber,
             prUrl,
+            paragraphCount: converted.metadata?.paragraphCount,
+            tableCount: converted.metadata?.tableCount,
+            imageCount: converted.metadata?.imageCount,
           },
         })
         .where(eq(documents.googleDocId, docId));
@@ -222,11 +300,16 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
           title: googleDoc.name,
           lastSynced: new Date(),
           lastModified: new Date(),
+          contentHash: changeResult.hashComparison.newHash,
+          contentSize: finalContent.length,
           metadata: {
             filePath,
             commitSha,
             prNumber,
             prUrl,
+            paragraphCount: converted.metadata?.paragraphCount,
+            tableCount: converted.metadata?.tableCount,
+            imageCount: converted.metadata?.imageCount,
           },
         });
     }
@@ -240,6 +323,9 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
         commitSha,
         filePath,
         filesChanged: "1",
+        contentHash: changeResult.hashComparison.newHash,
+        changeType: changeResult.summary.changeType,
+        changeReason: changeResult.summary.reason,
         completedAt: new Date(),
       })
       .where(eq(syncHistory.id, syncHistoryId!));
@@ -249,6 +335,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       docTitle: googleDoc.name,
       filePath,
       prUrl,
+      changeType: changeResult.summary.changeType,
     });
 
     return {
@@ -257,6 +344,7 @@ export async function executeSync({ docId, configId, userId }: SyncOptions): Pro
       prNumber,
       prUrl,
       filesChanged: 1,
+      changeType: changeResult.summary.changeType,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -317,4 +405,46 @@ export async function getTrackedDocuments(syncConfigId: string) {
     .from(documents)
     .where(eq(documents.syncConfigId, syncConfigId))
     .orderBy(documents.lastSynced);
+}
+
+/**
+ * Get the last sync hash for a document
+ */
+export async function getLastSyncHash(docId: string): Promise<string | null> {
+  const [doc] = await db
+    .select({ contentHash: documents.contentHash })
+    .from(documents)
+    .where(eq(documents.googleDocId, docId));
+
+  return doc?.contentHash || null;
+}
+
+/**
+ * Get sync statistics with change detection insights
+ */
+export async function getSyncStats(syncConfigId: string) {
+  const history = await db
+    .select()
+    .from(syncHistory)
+    .where(eq(syncHistory.syncConfigId, syncConfigId))
+    .orderBy(desc(syncHistory.startedAt))
+    .limit(100);
+
+  const stats = {
+    total: history.length,
+    successful: history.filter(h => h.status === 'success').length,
+    failed: history.filter(h => h.status === 'failed').length,
+    skipped: history.filter(h => h.status === 'skipped').length,
+    byChangeType: {} as Record<string, number>,
+    lastSync: history[0]?.startedAt,
+  };
+
+  // Count by change type
+  for (const entry of history) {
+    if (entry.changeType) {
+      stats.byChangeType[entry.changeType] = (stats.byChangeType[entry.changeType] || 0) + 1;
+    }
+  }
+
+  return stats;
 }

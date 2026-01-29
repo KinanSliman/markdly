@@ -5,13 +5,14 @@
  * Handles worker lifecycle, message routing, and error recovery
  */
 
-import type {
-  WorkerMessage,
-  WorkerConvertPayload,
-  WorkerProgressPayload,
-  WorkerResultPayload,
-  WorkerErrorPayload,
-  WorkerMessageType,
+import {
+  isWorkerMessage,             // 🟢 Imported as a value (Function)
+  type WorkerMessage,          // 🔵 Imported as a type
+  type WorkerConvertPayload,   // 🔵 Imported as a type
+  type WorkerProgressPayload,  // 🔵 Imported as a type
+  type WorkerResultPayload,    // 🔵 Imported as a type
+  type WorkerErrorPayload,     // 🔵 Imported as a type
+  type WorkerMessageType,      // 🔵 Imported as a type
 } from './types/worker-messages';
 
 // ============================================================================
@@ -75,8 +76,19 @@ export class WorkerWrapper {
 
     return new Promise((resolve, reject) => {
       try {
-        // Create worker from URL
-        this.worker = new Worker(this.workerUrl);
+        // Create worker using Next.js recommended pattern
+        // This allows Next.js to bundle the worker file with all its imports
+        // IMPORTANT: The constructor and URL must be one expression for Turbopack
+        // to detect and bundle the worker file
+        if (this.workerUrl === 'file-conversion-worker') {
+          // ⬇️ CRITICAL: The constructor and URL must be contiguous
+          this.worker = new Worker(
+            new URL('./file-conversion-worker.ts', import.meta.url)
+          );
+        } else {
+          // Fallback for testing or external URLs
+          this.worker = new Worker(this.workerUrl);
+        }
 
         // Set up message handler
         this.worker.onmessage = (event: MessageEvent) => {
@@ -341,9 +353,12 @@ export function isWebWorkerSupported(): boolean {
  * This is needed for Next.js dynamic imports
  */
 export function getFileConversionWorkerUrl(): string {
-  // In Next.js, we need to use a special URL format for workers
-  // This will be handled by the bundler
-  return new URL('./file-conversion-worker.ts', import.meta.url).href;
+  // In Next.js with Turbopack, workers need special handling
+  // Use the new URL() pattern which is the recommended approach
+  // This allows Next.js to bundle the worker file with all its imports
+  // Note: This function returns a string, but the actual URL is created
+  // using new URL() in the init() method
+  return 'file-conversion-worker';
 }
 
 /**

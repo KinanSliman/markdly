@@ -16,7 +16,9 @@
       "Bash(unzip:*)",
       "Bash(git checkout:*)",
       "Bash(npx next build:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(npm run test:*)",
+      "Bash(npx vitest:*)"
     ]
   }
 }

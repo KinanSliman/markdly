@@ -123,11 +123,14 @@ export const syncHistory = pgTable("sync_history", {
   syncConfigId: uuid("sync_config_id").references(() => syncConfigs.id),
   docId: text("doc_id"),
   docTitle: text("doc_title"),
-  status: text("status"), // 'pending', 'success', 'failed'
+  status: text("status"), // 'pending', 'success', 'failed', 'skipped'
   errorMessage: text("error_message"),
   filesChanged: text("files_changed"),
   commitSha: text("commit_sha"),
   filePath: text("file_path"), // Path to the file in GitHub repo
+  contentHash: text("content_hash"), // SHA-256 hash of content for change detection
+  changeType: text("change_type"), // Type of change detected
+  changeReason: text("change_reason"), // Reason for change
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
 });
@@ -141,6 +144,8 @@ export const documents = pgTable("documents", {
   lastSynced: timestamp("last_synced"),
   lastModified: timestamp("last_modified"),
   metadata: jsonb("metadata").$type<DocumentMetadata>(),
+  contentHash: text("content_hash"), // SHA-256 hash of content for change detection
+  contentSize: integer("content_size"), // Size in bytes
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
