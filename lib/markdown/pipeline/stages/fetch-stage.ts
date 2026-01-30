@@ -7,8 +7,8 @@
 
 import { google } from 'googleapis';
 import { PipelineStage, PipelineContext, PipelineError } from '../types';
-import { retry } from '../../utils/retry';
-import { rateLimiter } from '../../utils/rate-limit';
+import { withRetry } from '../../../utils/retry';
+import { withRateLimit, GOOGLE_DOCS_RATE_LIMITER } from '../../../utils/rate-limit';
 
 // Google Docs API client
 const docs = google.docs('v1');
@@ -39,12 +39,12 @@ export class FetchStage implements PipelineStage {
         auth.setCredentials({ refresh_token: token });
       }
 
-      // Apply rate limiting
-      const rateLimitedGet = rateLimiter.wrap(
-        async () => {
-          const startTime = performance.now();
+      // Apply rate limiting and retry logic
+      const startTime = performance.now();
 
-          const response = await retry(
+      const response = await withRateLimit(
+        async () => {
+          return await withRetry(
             async () => {
               return await docs.documents.get({
                 documentId: docId,
@@ -52,8 +52,8 @@ export class FetchStage implements PipelineStage {
               });
             },
             {
-              maxAttempts: 3,
-              backoffMs: 1000,
+              maxRetries: 3,
+              initialDelay: 1000,
               retryableErrors: [
                 'ECONNRESET',
                 'ETIMEDOUT',
@@ -63,20 +63,12 @@ export class FetchStage implements PipelineStage {
               ],
             }
           );
-
-          const endTime = performance.now();
-          context.metrics.fetchTime = endTime - startTime;
-
-          return response;
         },
-        {
-          key: 'google-docs-api',
-          limit: 300, // 300 requests per minute
-          window: 60000, // 1 minute window
-        }
+        GOOGLE_DOCS_RATE_LIMITER
       );
 
-      const response = await rateLimitedGet();
+      const endTime = performance.now();
+      context.metrics.fetchTime = endTime - startTime;
 
       if (!response.data) {
         throw new PipelineError('Empty response from Google Docs API', this.name, context);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,15 +9,6 @@ import { BookOpen, ArrowRight, Download, Loader2, Copy, CheckCircle, Lock, Uploa
 import Link from "next/link";
 import { toast } from "sonner";
 import { MarkdownPreview } from "@/components/markdown-preview";
-import {
-  isWebWorkerSupported,
-  createFileConversionWorker,
-  WorkerWrapper,
-  WorkerResultPayload,
-  WorkerErrorPayload,
-  WorkerProgressPayload,
-} from "@/lib/workers";
-import { ConversionProgress, useConversionProgress } from "@/components/conversion-progress";
 
 interface ConversionResult {
   title: string;
@@ -42,83 +33,6 @@ export default function ConverterPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [viewMode, setViewMode] = useState<"markdown" | "preview">("markdown");
   const [copied, setCopied] = useState(false);
-  const [worker, setWorker] = useState<WorkerWrapper | null>(null);
-  const [workerSupported, setWorkerSupported] = useState<boolean | null>(null);
-  const [workerError, setWorkerError] = useState<string | null>(null);
-
-  // Progress tracking hook
-  const {
-    progress,
-    stage,
-    message: progressMessage,
-    error: progressError,
-    isProcessing: isWorkerProcessing,
-    isComplete: isWorkerComplete,
-    setProgress,
-    setError: setProgressError,
-    setComplete,
-    reset: resetProgress,
-  } = useConversionProgress({
-    onProgress: (p, s, m) => console.log(`Progress: ${p}% - ${s}: ${m}`),
-    onComplete: () => console.log("Worker conversion complete"),
-    onError: (err) => console.error("Worker error:", err),
-  });
-
-  // Initialize worker on mount
-  useEffect(() => {
-    const checkWorkerSupport = async () => {
-      const supported = isWebWorkerSupported();
-      setWorkerSupported(supported);
-
-      if (supported) {
-        try {
-          const newWorker = await createFileConversionWorker({
-            onProgress: (payload: WorkerProgressPayload) => {
-              setProgress(payload.progress, payload.stage, payload.message);
-            },
-            onResult: (payload: WorkerResultPayload) => {
-              setResult({
-                title: payload.title,
-                content: payload.content,
-                images: payload.images,
-                tables: payload.tables,
-                headings: payload.headings.length,
-                sourceType: "file-upload",
-                metrics: payload.metrics,
-              });
-              setComplete();
-              setIsLoading(false);
-              toast.success("Conversion successful!");
-            },
-            onError: (payload: WorkerErrorPayload) => {
-              setProgressError(payload.message);
-              setError(payload.suggestion || payload.message);
-              setIsLoading(false);
-              toast.error("Conversion failed");
-            },
-            onWorkerError: (err) => {
-              setWorkerError(err.message);
-              setIsLoading(false);
-              toast.error("Worker error");
-            },
-          });
-          setWorker(newWorker);
-        } catch (err) {
-          setWorkerError(err instanceof Error ? err.message : "Failed to initialize worker");
-          toast.error("Failed to initialize Web Worker");
-        }
-      }
-    };
-
-    checkWorkerSupport();
-
-    // Cleanup on unmount
-    return () => {
-      if (worker) {
-        worker.dispose();
-      }
-    };
-  }, []);
 
   // Extract Google Doc ID from URL
   const extractDocId = (url: string): string | null => {
@@ -212,71 +126,6 @@ export default function ConverterPage() {
       return;
     }
 
-    if (!workerSupported) {
-      setError("Web Workers are not supported in this browser. Using API fallback.");
-      toast.error("Web Workers not supported");
-      // Fall back to API
-      return handleFileUploadApi();
-    }
-
-    if (!worker) {
-      setError("Worker not initialized yet. Please wait...");
-      return;
-    }
-
-    setError(null);
-    setResult(null);
-    resetProgress();
-    setIsLoading(true);
-
-    try {
-      // Read file based on type
-      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
-      let content: string;
-      let isBase64 = false;
-
-      if (fileExtension === 'docx') {
-        // For DOCX, read as base64
-        content = await readFileAsBase64(selectedFile);
-        isBase64 = true;
-      } else {
-        // For text-based files, read as text
-        content = await readFileAsText(selectedFile);
-      }
-
-      // Determine file type
-      let fileType: 'html' | 'txt' | 'rtf' | 'docx';
-      if (fileExtension === 'docx') {
-        fileType = 'docx';
-      } else if (fileExtension === 'rtf') {
-        fileType = 'rtf';
-      } else if (fileExtension === 'html' || fileExtension === 'htm') {
-        fileType = 'html';
-      } else {
-        fileType = 'txt';
-      }
-
-      // Use worker for conversion
-      await worker.convert({
-        content,
-        fileName: selectedFile.name,
-        fileType,
-        isBase64,
-      });
-    } catch (err: any) {
-      setError(err.message);
-      setProgressError(err.message);
-      setIsLoading(false);
-      toast.error("Conversion failed");
-    }
-  };
-
-  const handleFileUploadApi = async () => {
-    if (!selectedFile) {
-      setError("Please select a file first");
-      return;
-    }
-
     setError(null);
     setResult(null);
     setIsLoading(true);
@@ -339,41 +188,6 @@ export default function ConverterPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Download started!");
-  };
-
-  // Helper function to read file as text
-  const readFileAsText = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsText(file);
-    });
-  };
-
-  // Helper function to read file as base64
-  const readFileAsBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        // Remove data URL prefix if present
-        const base64 = result.split(',')[1] || result;
-        resolve(base64);
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-  };
-
-  // Cancel worker conversion
-  const cancelWorkerConversion = () => {
-    if (worker) {
-      worker.cancel();
-      resetProgress();
-      setIsLoading(false);
-      toast.info("Conversion cancelled");
-    }
   };
 
   return (
@@ -454,9 +268,7 @@ export default function ConverterPage() {
           <CardHeader>
             <CardTitle>Or Upload a File from Your Device</CardTitle>
             <CardDescription>
-              {workerSupported === null ? "Checking Web Worker support..." :
-               workerSupported ? "Using Web Worker for fast client-side conversion" :
-               "Using API fallback (Web Workers not supported)"}
+              Using API for fast server-side conversion
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -485,47 +297,14 @@ export default function ConverterPage() {
               )}
             </div>
 
-            {/* Progress Display */}
-            {(isWorkerProcessing || progress > 0) && !isWorkerComplete && (
-              <div className="space-y-3">
-                <ConversionProgress
-                  progress={progress}
-                  stage={stage}
-                  message={progressMessage}
-                  error={progressError}
-                  isProcessing={isWorkerProcessing}
-                  isComplete={isWorkerComplete}
-                  showStages={true}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={cancelWorkerConversion}
-                  className="w-full"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel Conversion
-                </Button>
-              </div>
-            )}
-
-            {/* Worker Error */}
-            {workerError && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  Worker Error: {workerError}. Please try using the API fallback.
-                </AlertDescription>
-              </Alert>
-            )}
-
             <div className="flex gap-2">
               <Button
                 onClick={handleFileUpload}
-                disabled={isLoading || !selectedFile || isWorkerProcessing}
+                disabled={isLoading || !selectedFile}
                 className="flex-1"
                 variant="secondary"
               >
-                {isLoading || isWorkerProcessing ? (
+                {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Converting...
@@ -537,13 +316,12 @@ export default function ConverterPage() {
                   </>
                 )}
               </Button>
-              {selectedFile && !isWorkerProcessing && (
+              {selectedFile && !isLoading && (
                 <Button
                   variant="outline"
                   onClick={() => {
                     setSelectedFile(null);
                     if (fileInputRef.current) fileInputRef.current.value = "";
-                    resetProgress();
                   }}
                 >
                   Clear

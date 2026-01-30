@@ -31,7 +31,7 @@ export {
 } from './pipeline-converter';
 
 // Front matter utilities
-export { generateFrontmatter, type FrontmatterTemplate } from './frontmatter';
+export { generateFrontMatter, type FrontmatterTemplate } from './frontmatter';
 
 // Pipeline module (full exports)
 export * from './pipeline';

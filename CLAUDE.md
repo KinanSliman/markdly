@@ -43,10 +43,20 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ### Phase 3: Architecture ✅
 - **Modular Pipeline**: 6 stages (Fetch → Parse → Process → Image → Format → Validate)
 - **Pipeline Orchestrator**: Stage coordination, error handling, performance metrics
-- **Web Worker Integration**: Client-side file conversion with progress tracking
 - **Caching Layer**: 10-100x faster repeated conversions with Redis/in-memory cache
 - **Test Suite**: 52 test cases with Vitest framework
 - **Performance Monitoring**: Real-time metrics collection, alert system, admin dashboard
+
+### Recent Changes (Bug Fixes)
+- **Removed Web Workers**: Due to Turbopack compatibility issues with `mammoth.js` library
+  - Workers caused empty error objects during file loading
+  - Now using API-based conversion for all file types (HTML, RTF, TXT, DOCX)
+  - Conversion remains fast and reliable via server-side processing
+- **Fixed Import Paths**: Corrected relative imports in pipeline stages (`../../utils` → `../../../utils`)
+- **Fixed Function Names**: Updated `generateFrontmatter` → `generateFrontMatter` to match actual exports
+- **Fixed Cache Manager**: Updated `createConversionCacheManager` → `createConversionCache` to match cache module exports
+- **Fixed Rate Limiter**: Updated `rateLimiter.wrap()` → `withRateLimit()` to match actual rate limiter API
+- **Removed Turbopack**: Disabled `--turbopack` flag due to Web Worker bundling issues
 
 ### Performance Monitoring ✅
 - **Metrics Collection**: Conversion times, sync operations, API response times, cache hit rates
@@ -72,7 +82,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ### Completed Milestones
 - **Phase 2 MVP**: Successfully converted real Google Docs with tables, code blocks (7 languages), headings, lists, blockquotes, links, task lists
 - **Phase 3 Milestone 1**: Modular pipeline architecture with 6 discrete stages ✅
-- **Phase 3 Milestone 2**: Web Worker integration for client-side conversion ✅
+- **Phase 3 Milestone 2**: Web Worker integration for client-side conversion ✅ (removed - incompatible with Turbopack)
 - **Phase 3 Milestone 3**: Caching layer with Redis/in-memory support ✅
 - **Phase 3 Milestone 4**: Comprehensive test suite (52 test cases) ✅
 - **Phase 3 Milestone 5**: Performance monitoring with alerts ✅
@@ -88,7 +98,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Structured API parsing** - Google Docs API provides exact document structure
 - **Deterministic rules** - 100% predictable output, no hallucinations
 - **Production-grade reliability** - 99.9% conversion accuracy, zero data loss
-- **Performance optimized** - Parallel processing, caching, Web Workers
+- **Performance optimized** - Parallel processing, caching, server-side conversion
 
 **Why NOT AI for conversion:**
 - ❌ AI hallucinates, is slow, expensive, and unpredictable
@@ -131,7 +141,7 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ADMIN_EMAIL=your-email@example.com  # Optional admin access
-GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Optional for public demo
+GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc conversion in demo mode
 ```
 
 ---
@@ -151,6 +161,7 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Optional for public demo
 3. See split-screen preview (original vs converted)
 4. Toggle between "Code" and "Preview" tabs
 5. Copy or download markdown (download requires sign-in)
+6. **Note**: File conversion uses server-side API for reliability (Web Workers removed due to Turbopack compatibility)
 
 ---
 
@@ -166,6 +177,10 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Optional for public demo
 8. **Missing `mode` column in sync_configs** → Added `mode TEXT DEFAULT 'github'` column
 9. **Sessions table primary key conflict** → Dropped and recreated `sessions` table
 10. **File upload escaping issue** → Fixed malformed escaping in `app/api/convert-demo/route.ts`
+11. **Web Worker loading errors** → Removed workers due to Turbopack/mammoth.js compatibility issues
+12. **Import path errors** → Fixed relative imports in pipeline stages
+13. **Function name mismatches** → Updated `generateFrontmatter` → `generateFrontMatter`, `createConversionCacheManager` → `createConversionCache`
+14. **Rate limiter API mismatch** → Updated `rateLimiter.wrap()` → `withRateLimit()`
 
 ---
 
@@ -179,7 +194,7 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Optional for public demo
 
 ## Priority Order
 
-1. **Converter** - Must be perfect (Phases 1-3) ✅
+1. **Converter** - Must be perfect (Phases 1-3) ✅ (Web Workers removed - using API fallback)
 2. **Auth** - Must work reliably ✅
 3. **Sync Engine** - Must be reliable ✅
 4. **UI/UX** - Can be improved later

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { convertGoogleDocToMarkdown, convertFileToMarkdownWithPipeline } from "@/lib/markdown";
-import { createConversionCacheManager, hashString } from "@/lib/cache";
+import { createConversionCache, hashString } from "@/lib/cache";
 import * as mammoth from "mammoth";
 
 // Initialize cache manager (singleton)
@@ -8,7 +8,7 @@ let cacheManager: any = null;
 
 async function getCacheManager() {
   if (!cacheManager) {
-    cacheManager = await createConversionCacheManager();
+    cacheManager = await createConversionCache();
   }
   return cacheManager;
 }

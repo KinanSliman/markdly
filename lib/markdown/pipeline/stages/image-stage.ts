@@ -8,7 +8,7 @@
 import { google } from 'googleapis';
 import { v2 as cloudinary } from 'cloudinary';
 import { PipelineStage, PipelineContext, PipelineError, ImageData } from '../types';
-import { rateLimiter } from '../../utils/rate-limit';
+import { withRateLimit, CLOUDINARY_RATE_LIMITER } from '../../../utils/rate-limit';
 
 // Initialize Cloudinary
 cloudinary.config({
@@ -130,7 +130,7 @@ export class ImageStage implements PipelineStage {
     cloudinaryFolder?: string
   ): Promise<ImageData> {
     // Apply rate limiting
-    const rateLimited = rateLimiter.wrap(
+    return await withRateLimit(
       async () => {
         // Step 1: Get image URL from Google Docs
         const imageUrl = await this.getImageUrlFromGoogleDocs(image.id, auth);
@@ -148,14 +148,8 @@ export class ImageStage implements PipelineStage {
           uploadResult,
         };
       },
-      {
-        key: 'cloudinary-api',
-        limit: 1000, // 1000 requests per hour
-        window: 3600000, // 1 hour window
-      }
+      CLOUDINARY_RATE_LIMITER
     );
-
-    return await rateLimited();
   }
 
   /**
