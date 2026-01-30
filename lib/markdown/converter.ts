@@ -299,6 +299,7 @@ function processParagraph(
   }
 
   // Process text elements with enhanced code block detection
+  let previousStyle: any = null;
   for (const element of elements) {
     if (element.textRun) {
       const content = element.textRun.content || "";
@@ -315,7 +316,8 @@ function processParagraph(
 
       // Apply formatting (skip for code blocks)
       if (!isCodeBlock) {
-        if (textStyle.bold) {
+        // Skip bold for headings (headings should not be bold in markdown)
+        if (textStyle.bold && !isHeading) {
           formattedText = `**${formattedText}**`;
         }
         if (textStyle.italic) {
@@ -333,9 +335,19 @@ function processParagraph(
           const url = textStyle.link.url;
           formattedText = `[${formattedText}](${url})`;
         }
+
+        // Check if we need to merge with previous element to avoid doubled markers
+        // This happens when adjacent elements have the same formatting
+        if (previousStyle && shouldMergeWithPrevious(textStyle, previousStyle, isHeading)) {
+          // Remove the closing markers from previous text and add new content
+          text = mergeAdjacentFormattedText(text, formattedText, textStyle, previousStyle, isHeading);
+          previousStyle = textStyle;
+          continue;
+        }
       }
 
       text += formattedText;
+      previousStyle = textStyle;
     } else if (element.inlineObjectElement) {
       // Handle inline images
       const inlineObjectId = element.inlineObjectElement.inlineObjectId;
@@ -345,6 +357,7 @@ function processParagraph(
         images.push({ url: imageUrl, alt: altText });
         text += `![${altText}](${imageUrl})`;
       }
+      previousStyle = null;
     }
   }
 
@@ -585,6 +598,86 @@ function detectCodeLanguage(content: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Determines if current element should merge with previous element
+ * to avoid doubled formatting markers
+ */
+function shouldMergeWithPrevious(currentStyle: any, previousStyle: any, isHeading: boolean): boolean {
+  // Only merge if both have the same formatting
+  const currentBold = currentStyle.bold && !isHeading;
+  const previousBold = previousStyle.bold && !isHeading;
+  const currentItalic = currentStyle.italic;
+  const previousItalic = previousStyle.italic;
+  const currentStrikethrough = currentStyle.strikethrough;
+  const previousStrikethrough = previousStyle.strikethrough;
+
+  // Check if formatting is the same
+  const boldMatch = currentBold === previousBold;
+  const italicMatch = currentItalic === previousItalic;
+  const strikethroughMatch = currentStrikethrough === previousStrikethrough;
+
+  return boldMatch && italicMatch && strikethroughMatch;
+}
+
+/**
+ * Merges adjacent formatted text to avoid doubled markers
+ */
+function mergeAdjacentFormattedText(
+  previousText: string,
+  currentText: string,
+  currentStyle: any,
+  previousStyle: any,
+  isHeading = false
+): string {
+  // Remove closing markers from previous text
+  let mergedText = previousText;
+
+  // Remove closing bold marker if present
+  if (previousStyle.bold && !isHeading && mergedText.endsWith('**')) {
+    mergedText = mergedText.slice(0, -2);
+  }
+
+  // Remove closing italic marker if present
+  if (previousStyle.italic && mergedText.endsWith('*')) {
+    mergedText = mergedText.slice(0, -1);
+  }
+
+  // Remove closing strikethrough marker if present
+  if (previousStyle.strikethrough && mergedText.endsWith('~~')) {
+    mergedText = mergedText.slice(0, -2);
+  }
+
+  // Add the new content (without opening markers since they're already there)
+  // Extract content without formatting markers
+  let contentToAdd = currentText;
+
+  // Remove opening markers from current text
+  if (currentStyle.bold && !isHeading && contentToAdd.startsWith('**')) {
+    contentToAdd = contentToAdd.slice(2);
+  }
+  if (currentStyle.italic && contentToAdd.startsWith('*')) {
+    contentToAdd = contentToAdd.slice(1);
+  }
+  if (currentStyle.strikethrough && contentToAdd.startsWith('~~')) {
+    contentToAdd = contentToAdd.slice(2);
+  }
+
+  mergedText += contentToAdd;
+
+  // Re-add closing markers
+  if (currentStyle.strikethrough) {
+    mergedText += '~~';
+  }
+  if (currentStyle.italic) {
+    mergedText += '*';
+  }
+  if (currentStyle.bold && !isHeading) {
+    mergedText += '**';
+  }
+
+  return mergedText;
 }
 
 /**

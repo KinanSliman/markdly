@@ -168,7 +168,7 @@ export class ProcessStage implements PipelineStage {
     // Generate markdown
     const indent = '  '.repeat(nestingLevel);
     const marker = listType === 'bullet' ? '-' : `${listState.startIndex}.`;
-    const text = this.extractText(paragraph);
+    const text = this.extractText(paragraph, false);
 
     // Increment start index for numbered lists
     if (listType === 'numbered') {
@@ -209,7 +209,7 @@ export class ProcessStage implements PipelineStage {
 
     headingState.lastLevel = level;
 
-    const text = this.extractText(paragraph);
+    const text = this.extractText(paragraph, true);
     const prefix = '#'.repeat(level);
 
     return {
@@ -253,7 +253,7 @@ export class ProcessStage implements PipelineStage {
     }
 
     // Heuristic 3: Indentation (4+ spaces)
-    const text = this.extractText(paragraph);
+    const text = this.extractText(paragraph, false);
     if (/^ {4,}/.test(text)) {
       return {
         isCodeBlock: true,
@@ -290,7 +290,7 @@ export class ProcessStage implements PipelineStage {
     detection: { isCodeBlock: boolean; reason?: string; language?: string },
     warnings: ConversionWarning[]
   ): ContentBlock {
-    const text = this.extractText(paragraph);
+    const text = this.extractText(paragraph, false);
     const language = detection.language || this.detectCodeLanguage(text);
 
     warnings.push({
@@ -314,7 +314,7 @@ export class ProcessStage implements PipelineStage {
    * Processes a regular paragraph
    */
   private processRegularParagraph(paragraph: any): ContentBlock {
-    const text = this.extractText(paragraph);
+    const text = this.extractText(paragraph, false);
 
     if (!text.trim()) {
       return null;
@@ -380,13 +380,16 @@ export class ProcessStage implements PipelineStage {
 
   /**
    * Extracts text from a paragraph
+   * @param paragraph - The paragraph to extract text from
+   * @param isHeading - If true, skip bold formatting (headings should not be bold)
    */
-  private extractText(paragraph: any): string {
+  private extractText(paragraph: any, isHeading = false): string {
     if (!paragraph.elements) {
       return '';
     }
 
     let text = '';
+    let previousStyle: any = null;
 
     for (const element of paragraph.elements) {
       if (!element || !element.textRun) {
@@ -399,7 +402,8 @@ export class ProcessStage implements PipelineStage {
       let formattedText = content;
 
       // Apply formatting
-      if (style.bold) {
+      // Skip bold for headings (headings should not be bold in markdown)
+      if (style.bold && !isHeading) {
         formattedText = `**${formattedText}**`;
       }
       if (style.italic) {
@@ -418,10 +422,99 @@ export class ProcessStage implements PipelineStage {
         formattedText = `[${formattedText}](${style.link.url})`;
       }
 
-      text += formattedText;
+      // Check if we need to merge with previous element to avoid doubled markers
+      // This happens when adjacent elements have the same formatting
+      if (previousStyle && this.shouldMergeWithPrevious(style, previousStyle, isHeading)) {
+        // Remove the closing markers from previous text and add new content
+        text = this.mergeAdjacentFormattedText(text, formattedText, style, previousStyle);
+      } else {
+        text += formattedText;
+      }
+
+      previousStyle = style;
     }
 
     return text.trim();
+  }
+
+  /**
+   * Determines if current element should merge with previous element
+   * to avoid doubled formatting markers
+   */
+  private shouldMergeWithPrevious(currentStyle: any, previousStyle: any, isHeading: boolean): boolean {
+    // Only merge if both have the same formatting
+    const currentBold = currentStyle.bold && !isHeading;
+    const previousBold = previousStyle.bold && !isHeading;
+    const currentItalic = currentStyle.italic;
+    const previousItalic = previousStyle.italic;
+    const currentStrikethrough = currentStyle.strikethrough;
+    const previousStrikethrough = previousStyle.strikethrough;
+
+    // Check if formatting is the same
+    const boldMatch = currentBold === previousBold;
+    const italicMatch = currentItalic === previousItalic;
+    const strikethroughMatch = currentStrikethrough === previousStrikethrough;
+
+    return boldMatch && italicMatch && strikethroughMatch;
+  }
+
+  /**
+   * Merges adjacent formatted text to avoid doubled markers
+   */
+  private mergeAdjacentFormattedText(
+    previousText: string,
+    currentText: string,
+    currentStyle: any,
+    previousStyle: any,
+    isHeading = false
+  ): string {
+    // Remove closing markers from previous text
+    let mergedText = previousText;
+
+    // Remove closing bold marker if present
+    if (previousStyle.bold && !isHeading && mergedText.endsWith('**')) {
+      mergedText = mergedText.slice(0, -2);
+    }
+
+    // Remove closing italic marker if present
+    if (previousStyle.italic && mergedText.endsWith('*')) {
+      mergedText = mergedText.slice(0, -1);
+    }
+
+    // Remove closing strikethrough marker if present
+    if (previousStyle.strikethrough && mergedText.endsWith('~~')) {
+      mergedText = mergedText.slice(0, -2);
+    }
+
+    // Add the new content (without opening markers since they're already there)
+    // Extract content without formatting markers
+    let contentToAdd = currentText;
+
+    // Remove opening markers from current text
+    if (currentStyle.bold && !isHeading && contentToAdd.startsWith('**')) {
+      contentToAdd = contentToAdd.slice(2);
+    }
+    if (currentStyle.italic && contentToAdd.startsWith('*')) {
+      contentToAdd = contentToAdd.slice(1);
+    }
+    if (currentStyle.strikethrough && contentToAdd.startsWith('~~')) {
+      contentToAdd = contentToAdd.slice(2);
+    }
+
+    mergedText += contentToAdd;
+
+    // Re-add closing markers
+    if (currentStyle.strikethrough) {
+      mergedText += '~~';
+    }
+    if (currentStyle.italic) {
+      mergedText += '*';
+    }
+    if (currentStyle.bold && !isHeading) {
+      mergedText += '**';
+    }
+
+    return mergedText;
   }
 
   /**
@@ -441,7 +534,7 @@ export class ProcessStage implements PipelineStage {
       let text = '';
       for (const paragraph of cell.content) {
         if (paragraph.paragraph) {
-          text += this.extractText(paragraph.paragraph) + ' ';
+          text += this.extractText(paragraph.paragraph, false) + ' ';
         }
       }
 
