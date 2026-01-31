@@ -1,9 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon, FileText, Lock, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon, FileText, Zap } from "lucide-react";
 import Link from "next/link";
-import { DocxConverterForm } from "@/components/forms/docx-converter-form";
 
 export default function LandingPage() {
   return (
@@ -20,7 +18,7 @@ export default function LandingPage() {
               <Link href="/auth/signin">Sign In</Link>
             </Button>
             <Button asChild>
-              <Link href="#converter">Try Converter</Link>
+              <Link href="/converter">Try Converter</Link>
             </Button>
           </div>
         </div>
@@ -29,16 +27,16 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto px-4 py-20 text-center">
         <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
-          Turn Google Docs into
+          Turn .docx files into
           <span className="text-primary"> GitHub-ready Markdown</span>
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          Automatically sync your Google Docs to GitHub as clean Markdown.
-          Images hosted on CDN, tables converted perfectly, PRs created automatically.
+          Convert your Word documents to clean Markdown instantly.
+          Images hosted on CDN, tables converted perfectly, ready for GitHub.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" asChild>
-            <Link href="#converter">
+            <Link href="/converter">
               Try Converter Free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -67,7 +65,7 @@ export default function LandingPage() {
               <BookOpen className="h-8 w-8 text-primary mb-2" />
               <CardTitle>Robust Conversion</CardTitle>
               <CardDescription>
-                Google Docs tables, code blocks, headings — all converted accurately to clean Markdown.
+                .docx tables, code blocks, headings — all converted accurately to clean Markdown.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -87,19 +85,7 @@ export default function LandingPage() {
       {/* Supported Formats */}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-center mb-8">Supported Formats</h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <BookOpen className="h-6 w-6 text-primary" />
-                <CardTitle className="text-xl">Google Docs</CardTitle>
-              </div>
-              <CardDescription>
-                Full support with tables, code blocks, headings, images, and formatting. Requires Google OAuth connection for private documents.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
+        <div className="grid md:grid-cols-1 gap-6 max-w-2xl mx-auto">
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -107,40 +93,11 @@ export default function LandingPage() {
                 <CardTitle className="text-xl">DOCX (Word)</CardTitle>
               </div>
               <CardDescription>
-                High-quality conversion using mammoth.js. Upload directly without sign-in. Preserves headings, tables, and formatting.
+                High-quality conversion using mammoth.js. Upload directly without sign-in. Preserves headings, tables, code blocks, and formatting.
               </CardDescription>
             </CardHeader>
           </Card>
         </div>
-
-        {/* OAuth Requirement Notice */}
-        <Alert className="mt-6 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
-          <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
-          <AlertDescription className="text-amber-800 dark:text-amber-200">
-            <strong>Google Docs require sign-in:</strong> To convert Google Docs, you need to connect your Google account via OAuth. This is because Google Docs are private and require authentication to access. For DOCX file uploads, no sign-in is required.
-          </AlertDescription>
-        </Alert>
-      </section>
-
-      {/* Converter Section */}
-      <section id="converter" className="max-w-4xl mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold text-center mb-8">Try the Converter</h2>
-        <DocxConverterForm isDemo={true} />
-      </section>
-
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
-          <CardContent className="p-8 text-center">
-            <h2 className="text-3xl font-bold mb-4">Ready to streamline your docs workflow?</h2>
-            <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
-              Join developer relations teams and open-source projects already using Markdly to sync their documentation.
-            </p>
-            <Button size="lg" asChild>
-              <Link href="#converter">Try Converter Now</Link>
-            </Button>
-          </CardContent>
-        </Card>
       </section>
 
       {/* Footer */}

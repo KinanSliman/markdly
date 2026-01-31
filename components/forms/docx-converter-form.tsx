@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, Link, Loader2, AlertCircle, CheckCircle2, Copy, Download, Globe, FileUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MarkdownPreview } from '@/components/markdown-preview';
@@ -151,12 +151,6 @@ export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFo
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Convert .docx to Markdown</CardTitle>
-          <CardDescription>
-            Upload a .docx file or enter a URL to convert to GitHub-ready Markdown
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <div className="space-y-6">
             {/* Input Method Selection */}
@@ -328,7 +322,7 @@ export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFo
             <Alert variant="warning">
               <AlertCircle className="w-4 h-4" />
               <AlertTitle>Conversion Warnings</AlertTitle>
-              <AlertDescription>
+              <AlertDescription asChild>
                 <ul className="list-disc list-inside space-y-1 mt-2">
                   {result.warnings.map((warning, index) => (
                     <li key={index}>
