@@ -20,11 +20,15 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Performance Monitoring**: Real-time metrics, trend charts, threshold-based alerts, alert management
 
 ### Converter Features
-- **Web-Based Demo**: `/converter` page - try without sign-in
+- **Web-Based Demo**: Homepage converter section - try without sign-in
 - **File Upload**: DOCX files only (uses `mammoth.js` for conversion)
+- **URL Input**: Direct .docx URL conversion support
+- **Split-Screen Preview**: Original file (left) vs Converted Markdown (right)
+- **Preview Toggle**: Switch between rendered preview and raw code view
 - **Premium Previewer**: VS Code-style dark theme with syntax highlighting (70+ languages), GFM tables, task lists, strikethrough
 - **Download & Copy**: Direct markdown file download and clipboard copy with visual feedback
 - **Unified Converter Logic**: Single source of truth for all conversions (Google Docs + DOCX files)
+- **Raw Text Extraction**: Shows extracted text from .docx files in original preview
 
 ### Phase 1: Reliability & Performance ✅
 - **Retry Logic**: Exponential backoff (1s → 2s → 4s → 8s, max 3 retries)
@@ -69,6 +73,14 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Fixed Cache Manager**: Updated `createConversionCacheManager` → `createConversionCache` to match cache module exports
 - **Fixed Rate Limiter**: Updated `rateLimiter.wrap()` → `withRateLimit()` to match actual rate limiter API
 - **Removed Turbopack**: Disabled `--turbopack` flag due to Web Worker bundling issues
+- **Homepage Converter**: Added reusable .docx converter form to homepage
+  - Created `/app/api/convert-file/route.ts` for file upload conversion
+  - Created `/components/forms/docx-converter-form.tsx` for URL input and file upload
+  - Split-screen view: Original file (left) vs Converted Markdown (right)
+  - Preview toggle: Switch between rendered preview and raw code
+  - Extracts raw text from .docx for original file display
+  - Uses existing unified-converter for conversion
+  - No sign-in required for demo mode
 
 ### Performance Monitoring ✅
 - **Metrics Collection**: Conversion times, sync operations, API response times, cache hit rates
@@ -269,6 +281,9 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 14. **Rate limiter API mismatch** → Updated `rateLimiter.wrap()` → `withRateLimit()`
 15. **Multiple converter logics** → Consolidated into single unified converter (`lib/markdown/unified-converter.ts`)
 16. **Unsupported file types** → Dropped HTML, RTF, TXT support (focus on .docx only)
+17. **Homepage converter** → Added reusable .docx converter form with split-screen preview
+18. **Edge runtime issue** → Removed edge runtime from API route for Node.js module support
+19. **Binary file display** → Extract raw text from .docx for original file preview
 
 ---
 

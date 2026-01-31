@@ -328,8 +328,8 @@ function sanitizeErrorMessage(message: string): string {
   // Remove sensitive information from error messages
   return message
     .replace(/Bearer\s+[^\s]+/gi, 'Bearer [REDACTED]')
-    .replace(/token[=:]\\s*[^\\s&]+/gi, 'token=[REDACTED]')
-    .replace(/key[=:]\\s*[^\\s&]+/gi, 'key=[REDACTED]');
+    .replace(/token[=:]\s*[^\s&]+/gi, 'token=[REDACTED]')
+    .replace(/key[=:]\s*[^\s&]+/gi, 'key=[REDACTED]');
 }
 
 // ============================================================================
@@ -592,7 +592,7 @@ function processParagraph(
       warnings.push({
         type: 'list',
         message: `List nesting jumped from ${listState.currentNestingLevel} to ${nestingLevel}`,
-        suggestion: 'Don\\'t skip nesting levels',
+        suggestion: 'Don\'t skip nesting levels',
         context: `List ID: ${listId}`,
         severity: 'medium',
       });
@@ -604,7 +604,7 @@ function processParagraph(
     listState.lastParagraphWasList = true;
 
     const indent = '  '.repeat(nestingLevel);
-    return isNumbered
+    return isNumbered 
       ? `${indent}1. ${text.trim()}\n`
       : `${indent}- ${text.trim()}\n`;
   }
@@ -663,7 +663,7 @@ function processTable(table: any): {
   warnings: ConversionWarning[];
 } {
   const warnings: ConversionWarning[] = [];
-
+  
   if (!table.tableRows || table.tableRows.length === 0) {
     return { markdown: '', warnings };
   }
@@ -700,7 +700,7 @@ function processTable(table: any): {
         warnings.push({
           type: 'table',
           message: 'Empty table cell detected',
-          suggestion: 'May indicate merged cell - Markdown doesn\\'t support cell merging',
+          suggestion: 'May indicate merged cell - Markdown doesn\'t support cell merging',
           context: `Row ${rowIndex + 1}, Cell ${cellIndex + 1}`,
           severity: 'low',
         });
@@ -789,7 +789,7 @@ function parseHtmlToMarkdown(html: string): {
 
   // Convert headings (priority order for specificity)
   for (let level = 1; level <= 6; level++) {
-    const regex = new RegExp(`<h${level}[^>]*>(.*?)<\\/h${level}>`, 'gi');
+    const regex = new RegExp(`<h${level}[^>]*>(.*?)<\/h${level}>`, 'gi');
     markdown = markdown.replace(regex, (match, content) => {
       const text = sanitizeText(stripHtmlTags(content).trim());
       if (text) {
@@ -801,13 +801,13 @@ function parseHtmlToMarkdown(html: string): {
   }
 
   // Convert bold and italic
-  markdown = markdown.replace(/<strong[^>]*>(.*?)<\\/strong>/gi, '**$1**');
-  markdown = markdown.replace(/<b[^>]*>(.*?)<\\/b>/gi, '**$1**');
-  markdown = markdown.replace(/<em[^>]*>(.*?)<\\/em>/gi, '*$1*');
-  markdown = markdown.replace(/<i[^>]*>(.*?)<\\/i>/gi, '*$1*');
+  markdown = markdown.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
+  markdown = markdown.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
+  markdown = markdown.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
+  markdown = markdown.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
 
   // Convert links with URL sanitization
-  markdown = markdown.replace(/<a[^>]*href=["'](.*?)["'][^>]*>(.*?)<\\/a>/gi, (match, url, text) => {
+  markdown = markdown.replace(/<a[^>]*href=["'](.*?)["'][^>]*>(.*?)<\/a>/gi, (match, url, text) => {
     const sanitizedUrl = sanitizeUrl(url);
     const sanitizedText = sanitizeText(text);
     return `[${sanitizedText}](${sanitizedUrl})`;
@@ -830,26 +830,26 @@ function parseHtmlToMarkdown(html: string): {
   });
 
   // Convert paragraphs
-  markdown = markdown.replace(/<p[^>]*>(.*?)<\\/p>/gi, '$1\n\n');
+  markdown = markdown.replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n');
 
   // Convert line breaks
-  markdown = markdown.replace(/<br\s*\\/?>/gi, '\n');
+  markdown = markdown.replace(/<br\s*\/?>/gi, '\n');
 
   // Convert lists
-  markdown = markdown.replace(/<ul[^>]*>(.*?)<\\/ul>/gis, (match, content) => {
-    return content.replace(/<li[^>]*>(.*?)<\\/li>/gi, (m: string, item: string) => `- ${item.trim()}\n`) + '\n';
+  markdown = markdown.replace(/<ul[^>]*>(.*?)<\/ul>/gis, (match, content) => {
+    return content.replace(/<li[^>]*>(.*?)<\/li>/gi, (m: string, item: string) => `- ${item.trim()}\n`) + '\n';
   });
-  markdown = markdown.replace(/<ol[^>]*>(.*?)<\\/ol>/gis, (match, content) => {
+  markdown = markdown.replace(/<ol[^>]*>(.*?)<\/ol>/gis, (match, content) => {
     let i = 1;
-    return content.replace(/<li[^>]*>(.*?)<\\/li>/gi, (m: string, item: string) => `${i++}. ${item.trim()}\n`) + '\n';
+    return content.replace(/<li[^>]*>(.*?)<\/li>/gi, (m: string, item: string) => `${i++}. ${item.trim()}\n`) + '\n';
   });
 
   // Convert code blocks
-  markdown = markdown.replace(/<code[^>]*>(.*?)<\\/code>/gi, '`$1`');
-  markdown = markdown.replace(/<pre[^>]*>(.*?)<\\/pre>/gis, '```\n$1\n```\n\n');
+  markdown = markdown.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+  markdown = markdown.replace(/<pre[^>]*>(.*?)<\/pre>/gis, '```\n$1\n```\n\n');
 
   // Convert blockquotes
-  markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\\/blockquote>/gis, (match, content) => {
+  markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, (match, content) => {
     return content
       .split('\n')
       .map((line: string) => line.trim() ? `> ${line}` : '')
@@ -857,7 +857,7 @@ function parseHtmlToMarkdown(html: string): {
   });
 
   // Convert tables
-  markdown = markdown.replace(/<table[^>]*>(.*?)<\\/table>/gis, (match, content) => {
+  markdown = markdown.replace(/<table[^>]*>(.*?)<\/table>/gis, (match, content) => {
     const tableResult = convertHtmlTableToMarkdown(content);
     if (tableResult.markdown) {
       tables.push({ rows: tableResult.rows });
@@ -885,26 +885,26 @@ function parseHtmlToMarkdown(html: string): {
 function removeHtmlTags(html: string, tagName: string): string {
   const openTag = `<${tagName}`;
   const closeTag = `</${tagName}>`;
-
+  
   let result = html;
   let attempts = 0;
   const maxAttempts = 1000; // Prevent infinite loops
-
+  
   while (attempts < maxAttempts) {
     const startIndex = result.toLowerCase().indexOf(openTag.toLowerCase());
     if (startIndex === -1) break;
-
+    
     const endIndex = result.toLowerCase().indexOf(closeTag.toLowerCase(), startIndex);
     if (endIndex === -1) {
       // Malformed tag, remove to end of string
       result = result.substring(0, startIndex);
       break;
     }
-
+    
     result = result.substring(0, startIndex) + result.substring(endIndex + closeTag.length);
     attempts++;
   }
-
+  
   return result;
 }
 
@@ -918,21 +918,21 @@ function convertHtmlTableToMarkdown(htmlTable: string): {
   rows: string[][];
 } {
   const rows: string[][] = [];
-  const rowMatches = htmlTable.match(/<tr[^>]*>(.*?)<\\/tr>/gis);
-
+  const rowMatches = htmlTable.match(/<tr[^>]*>(.*?)<\/tr>/gis);
+  
   if (!rowMatches) {
     return { markdown: '', rows: [] };
   }
 
   for (const rowMatch of rowMatches) {
     const cells: string[] = [];
-    const cellMatches = rowMatch.match(/<t[dh][^>]*>(.*?)<\\/t[dh]>/gis);
+    const cellMatches = rowMatch.match(/<t[dh][^>]*>(.*?)<\/t[dh]>/gis);
 
     if (cellMatches) {
       for (const cellMatch of cellMatches) {
         const content = cellMatch
           .replace(/<t[dh][^>]*>/, '')
-          .replace(/<\\/t[dh]>/, '')
+          .replace(/<\/t[dh]>/, '')
           .replace(/<[^>]+>/g, '')
           .replace(/\s+/g, ' ')
           .trim();
@@ -1104,7 +1104,7 @@ async function processImagesParallel(
   for (const { original, cloudinary, success } of results) {
     if (success && cloudinary) {
       const escapedUrl = escapeRegex(original);
-      const imageRegex = new RegExp(`!\\[([^\\]]*)\\]\\(${escapedUrl}\\)`, 'g');
+      const imageRegex = new RegExp(`!\\[(.*?)\\]\\(${escapedUrl}\\)`, 'g');
       result = result.replace(imageRegex, (match, altText) => {
         return `![${altText}](${cloudinary})`;
       });
@@ -1141,7 +1141,7 @@ async function processImagesForFileParallel(
   for (const { original, cloudinary, success } of results) {
     if (success && cloudinary) {
       const escapedUrl = escapeRegex(original);
-      const imageRegex = new RegExp(`!\\[([^\\]]*)\\]\\(${escapedUrl}\\)`, 'g');
+      const imageRegex = new RegExp(`!\\[(.*?)\\]\\(${escapedUrl}\\)`, 'g');
       result = result.replace(imageRegex, (match, altText) => {
         return `![${altText}](${cloudinary})`;
       });
@@ -1172,7 +1172,7 @@ async function processGoogleDocImage(
     }
 
     const blob = await response.blob();
-
+    
     // Validate image size
     if (blob.size > 10 * 1024 * 1024) { // 10MB limit
       throw new Error('Image size exceeds 10MB limit');
@@ -1181,7 +1181,7 @@ async function processGoogleDocImage(
     const arrayBuffer = await blob.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = blob.type || 'image/png';
-
+    
     // Validate mime type
     if (!mimeType.startsWith('image/')) {
       throw new Error('Invalid image mime type');
@@ -1202,13 +1202,13 @@ async function processFileImage(imageUrl: string, cloudinaryFolder: string): Pro
 
   try {
     const response = await fetch(imageUrl, { signal: controller.signal });
-
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${response.status}`);
     }
 
     const blob = await response.blob();
-
+    
     if (blob.size > 10 * 1024 * 1024) {
       throw new Error('Image size exceeds 10MB limit');
     }
@@ -1216,7 +1216,7 @@ async function processFileImage(imageUrl: string, cloudinaryFolder: string): Pro
     const arrayBuffer = await blob.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = blob.type || 'image/png';
-
+    
     if (!mimeType.startsWith('image/')) {
       throw new Error('Invalid image mime type');
     }
@@ -1246,7 +1246,7 @@ async function retryWithBackoff<T>(
       return await fn();
     } catch (error: any) {
       lastError = error;
-
+      
       if (attempt < maxAttempts - 1) {
         const delay = baseDelay * Math.pow(2, attempt);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -1290,7 +1290,7 @@ function sanitizeText(text: string): string {
 function sanitizeUrl(url: string): string {
   // Only allow http, https, and relative URLs
   const trimmed = url.trim();
-
+  
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
     // Remove javascript: and data: protocols
     if (trimmed.toLowerCase().includes('javascript:') || trimmed.toLowerCase().startsWith('data:')) {
@@ -1298,12 +1298,12 @@ function sanitizeUrl(url: string): string {
     }
     return trimmed;
   }
-
+  
   // Relative URLs are ok
   if (!trimmed.includes(':')) {
     return trimmed;
   }
-
+  
   return '#';
 }
 
@@ -1342,8 +1342,8 @@ function formatMarkdown(markdown: string): {
       const cells = line
         .split('|')
         .map(c => c.trim())
-      .filter(c => c.length > 0 && !c.match(/^-+$/));
-
+        .filter(c => c.length > 0 && !c.match(/^-+$/));
+      
       if (cells.length > 0) {
         currentTable.push(cells);
       }
@@ -1375,9 +1375,9 @@ function formatMarkdown(markdown: string): {
   };
 }
 
-function validateMarkdown(content: string): {
-  valid: boolean;
-  warnings: ConversionWarning[]
+function validateMarkdown(content: string): { 
+  valid: boolean; 
+  warnings: ConversionWarning[] 
 } {
   const warnings: ConversionWarning[] = [];
 
@@ -1486,7 +1486,7 @@ function hasCodePattern(text: string): boolean {
     /^(package|func|var|type|struct|interface)\s+/,
     /^(using|namespace|void)\s+/,
     /^(fn|let|mut|pub|impl|trait)\s+/,
-    /^#include\s*[<\"]/,
+    /^#include\s*[<"]/,
     /^<\?php/,
     /^#!/,
     /console\.(log|error|warn|info)\s*\(/,
@@ -1549,9 +1549,9 @@ function detectCodeLanguage(content: string): string | null {
       /throws\s+\w+/
     ]],
     ['cpp', [
-      /#include\s*[<\"]/,
+      /#include\s*[<"]/,
       /std::/,
-      /cout\s*</,
+      /cout\s*<</,
       /cin\s*>>/,
       /->\w+/,
       /\w+::\w+/
@@ -1583,7 +1583,7 @@ function detectCodeLanguage(content: string): string | null {
       /end\s*$/m,
       /class\s+\w+/,
       /module\s+\w+/,
-      /\.\@\w+/,
+      /\.@\w+/,
       /\|\w+\|/
     ]],
     ['sql', [

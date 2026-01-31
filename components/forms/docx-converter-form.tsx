@@ -58,9 +58,21 @@ export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFo
       if (activeTab === 'upload' && file) {
         formData.append('file', file);
 
-        // .docx files are binary (ZIP archives), not plain text
-        // Show a message instead of trying to decode binary data
-        setOriginalContent('[Binary .docx file - content cannot be displayed as text]');
+        // Extract raw text from .docx file for preview
+        const arrayBuffer = await file.arrayBuffer();
+        try {
+          // Use mammoth to extract raw text
+          const mammoth = await import('mammoth');
+          const textResult = await mammoth.extractRawText({ arrayBuffer });
+          const rawText = textResult.value
+            .replace(/\n{4,}/g, '\n\n')
+            .replace(/[ \t]+$/gm, '')
+            .trim();
+          setOriginalContent(rawText || '[No text content found]');
+        } catch (mammothError) {
+          console.error('Mammoth error:', mammothError);
+          setOriginalContent('[Could not extract text from file]');
+        }
       } else if (activeTab === 'url' && url) {
         formData.append('url', url);
 
@@ -280,25 +292,7 @@ export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFo
                     </span>
                   </div>
                   <div className="bg-muted p-3 rounded-lg overflow-auto max-h-[500px] text-sm font-mono">
-                    {originalContent === '[Binary .docx file - content cannot be displayed as text]' ? (
-                      <div className="text-center py-8">
-                        <div className="text-4xl mb-2">📄</div>
-                        <div className="font-semibold">Binary .docx File</div>
-                        <div className="text-muted-foreground text-xs mt-1">
-                          .docx files are binary archives (ZIP format) containing XML.
-                          <br />
-                          The converter extracts and converts the content to Markdown.
-                        </div>
-                      </div>
-                    ) : originalContent === '[Binary file - content cannot be displayed as text]' ? (
-                      <div className="text-center py-8">
-                        <div className="text-4xl mb-2">📄</div>
-                        <div className="font-semibold">Binary File</div>
-                        <div className="text-muted-foreground text-xs mt-1">
-                          This file is in a binary format that cannot be displayed as text.
-                        </div>
-                      </div>
-                    ) : originalContent ? (
+                    {originalContent ? (
                       <pre>{originalContent}</pre>
                     ) : (
                       'Loading...'
