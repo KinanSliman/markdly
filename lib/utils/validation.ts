@@ -501,3 +501,37 @@ export function validateSyncMode(mode: string): string {
 
   return trimmedMode;
 }
+
+/**
+ * Validates a .docx file
+ *
+ * @param file - The file to validate
+ * @returns The validated file
+ * @throws {InvalidFileError} If the file is not a valid .docx file
+ *
+ * @example
+ * const file = validateDocxFile(selectedFile);
+ */
+export function validateDocxFile(file: File): File {
+  if (!file || !(file instanceof File)) {
+    throw new InvalidFileError(file?.name || 'unknown', ['.docx']);
+  }
+
+  // Check file extension
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension !== 'docx') {
+    throw new InvalidFileError(file.name, ['.docx']);
+  }
+
+  // Check MIME type (optional, as some browsers may not report it correctly)
+  const validMimeTypes = [
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/zip', // .docx files are ZIP archives
+  ];
+
+  if (file.type && !validMimeTypes.includes(file.type)) {
+    throw new InvalidFileError(file.name, ['.docx']);
+  }
+
+  return file;
+}

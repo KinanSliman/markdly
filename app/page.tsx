@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon, FileText, Upload, Lock, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon, FileText, Lock, Zap } from "lucide-react";
 import Link from "next/link";
+import { DocxConverterForm } from "@/components/forms/docx-converter-form";
 
 export default function LandingPage() {
   return (
@@ -19,7 +20,7 @@ export default function LandingPage() {
               <Link href="/auth/signin">Sign In</Link>
             </Button>
             <Button asChild>
-              <Link href="/converter">Try Converter</Link>
+              <Link href="#converter">Try Converter</Link>
             </Button>
           </div>
         </div>
@@ -37,8 +38,8 @@ export default function LandingPage() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" asChild>
-            <Link href="/converter">
-              Start Syncing Free
+            <Link href="#converter">
+              Try Converter Free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -110,39 +111,21 @@ export default function LandingPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Upload className="h-6 w-6 text-primary" />
-                <CardTitle className="text-xl">HTML & RTF</CardTitle>
-              </div>
-              <CardDescription>
-                Direct file upload conversion. No sign-in required. Perfect for exported content from other tools.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Zap className="h-6 w-6 text-primary" />
-                <CardTitle className="text-xl">TXT (Plain Text)</CardTitle>
-              </div>
-              <CardDescription>
-                Simple text files with preserved line breaks. Quick conversion for basic content.
-              </CardDescription>
-            </CardHeader>
-          </Card>
         </div>
 
         {/* OAuth Requirement Notice */}
         <Alert className="mt-6 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
           <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
           <AlertDescription className="text-amber-800 dark:text-amber-200">
-            <strong>Google Docs require sign-in:</strong> To convert Google Docs, you need to connect your Google account via OAuth. This is because Google Docs are private and require authentication to access. For public file uploads (DOCX, HTML, RTF, TXT), no sign-in is required.
+            <strong>Google Docs require sign-in:</strong> To convert Google Docs, you need to connect your Google account via OAuth. This is because Google Docs are private and require authentication to access. For DOCX file uploads, no sign-in is required.
           </AlertDescription>
         </Alert>
+      </section>
+
+      {/* Converter Section */}
+      <section id="converter" className="max-w-4xl mx-auto px-4 py-16">
+        <h2 className="text-3xl font-bold text-center mb-8">Try the Converter</h2>
+        <DocxConverterForm isDemo={true} />
       </section>
 
       {/* CTA */}
@@ -154,7 +137,7 @@ export default function LandingPage() {
               Join developer relations teams and open-source projects already using Markdly to sync their documentation.
             </p>
             <Button size="lg" asChild>
-              <Link href="/converter">Try Converter Now</Link>
+              <Link href="#converter">Try Converter Now</Link>
             </Button>
           </CardContent>
         </Card>

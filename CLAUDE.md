@@ -21,9 +21,10 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 
 ### Converter Features
 - **Web-Based Demo**: `/converter` page - try without sign-in
-- **File Upload**: HTML, RTF, TXT, DOCX files (uses `mammoth.js` for DOCX)
+- **File Upload**: DOCX files only (uses `mammoth.js` for conversion)
 - **Premium Previewer**: VS Code-style dark theme with syntax highlighting (70+ languages), GFM tables, task lists, strikethrough
 - **Download & Copy**: Direct markdown file download and clipboard copy with visual feedback
+- **Unified Converter Logic**: Single source of truth for all conversions (Google Docs + DOCX files)
 
 ### Phase 1: Reliability & Performance ✅
 - **Retry Logic**: Exponential backoff (1s → 2s → 4s → 8s, max 3 retries)
@@ -46,11 +47,22 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Caching Layer**: 10-100x faster repeated conversions with Redis/in-memory cache
 - **Test Suite**: 52 test cases with Vitest framework
 - **Performance Monitoring**: Real-time metrics collection, alert system, admin dashboard
+- **Unified Converter**: Single source of truth for all conversions (Google Docs + .docx files)
+- **Focused File Support**: .docx only (via mammoth.js) - dropped HTML, RTF, TXT
 
-### Recent Changes (Bug Fixes)
+### Recent Changes (Architecture & Bug Fixes)
+- **Consolidated Converter Logic**: Unified all conversion logic into a single source of truth
+  - Created `lib/markdown/unified-converter.ts` with modular pipeline architecture
+  - Supports both Google Docs API and .docx file conversion
+  - Consistent output across all conversion paths (demo, authenticated, sync)
+  - Removed duplicate conversion logic from API routes
+- **Focused on .docx Format**: Dropped support for HTML, RTF, TXT files
+  - Simplified file upload to only accept .docx files
+  - Reduced code complexity and maintenance burden
+  - mammoth.js handles .docx → HTML → Markdown conversion
 - **Removed Web Workers**: Due to Turbopack compatibility issues with `mammoth.js` library
   - Workers caused empty error objects during file loading
-  - Now using API-based conversion for all file types (HTML, RTF, TXT, DOCX)
+  - Now using API-based conversion for all file types
   - Conversion remains fast and reliable via server-side processing
 - **Fixed Import Paths**: Corrected relative imports in pipeline stages (`../../utils` → `../../../utils`)
 - **Fixed Function Names**: Updated `generateFrontmatter` → `generateFrontMatter` to match actual exports
@@ -86,6 +98,8 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Phase 3 Milestone 3**: Caching layer with Redis/in-memory support ✅
 - **Phase 3 Milestone 4**: Comprehensive test suite (52 test cases) ✅
 - **Phase 3 Milestone 5**: Performance monitoring with alerts ✅
+- **Phase 3 Milestone 6**: Unified converter logic with single source of truth ✅
+- **Phase 3 Milestone 7**: Focused .docx support (dropped HTML, RTF, TXT) ✅
 
 ### Remaining Milestones
 - **Phase 4**: Advanced features (document revision tracking, batch processing, multi-format export, change detection UI)
@@ -99,10 +113,16 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Deterministic rules** - 100% predictable output, no hallucinations
 - **Production-grade reliability** - 99.9% conversion accuracy, zero data loss
 - **Performance optimized** - Parallel processing, caching, server-side conversion
+- **Unified Architecture** - Single converter logic for all use cases (Google Docs + .docx)
+- **Consistent Output** - Same conversion results regardless of input source
 
 **Why NOT AI for conversion:**
 - ❌ AI hallucinates, is slow, expensive, and unpredictable
 - ✅ Deterministic rules are fast, cheap, and 100% accurate
+
+**Why NOT multiple converter logics:**
+- ❌ Multiple codebases = inconsistent output, harder to maintain
+- ✅ Single unified converter = consistent output, easier to maintain
 
 ---
 
@@ -124,6 +144,71 @@ Markdown Input → remark-parse → remark-gfm → remark-rehype
 → rehype-highlight (70+ languages) → rehype-slug → rehype-raw
 → rehype-stringify → Rendered HTML with syntax highlighting
 ```
+
+### Unified Converter Architecture
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Unified Converter API                      │
+│  (lib/markdown/unified-converter.ts)                        │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+   Google Docs API        DOCX Files          Caching Layer
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+│ Fetch Stage   │    │ Mammoth.js    │    │  getCache()   │
+│ (API Auth)    │    │ (DOCX→HTML)   │    │  setCache()   │
+└───────────────┘    └───────────────┘    └───────────────┘
+        │                     │                     │
+        └─────────────────────┼─────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Parse Stage     │
+                    │ (HTML→Markdown) │
+                    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Process Stage   │
+                    │ (Code blocks,   │
+                    │  lists, tables) │
+                    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Image Stage     │
+                    │ (Cloudinary)    │
+                    │ (Optional)      │
+                    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Format Stage    │
+                    │ (Front matter)  │
+                    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Validate Stage  │
+                    │ (Warnings)      │
+                    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  Final Output   │
+                    │  (Markdown)     │
+                    └─────────────────┘
+```
+
+**Key Benefits:**
+- **Single Source of Truth**: One converter logic for all use cases
+- **Consistent Output**: Same conversion results regardless of input source
+- **Modular Design**: Pipeline stages can be configured per use case
+- **Easy Testing**: One test suite covers all conversion paths
+- **Maintainability**: Bug fixes and improvements apply everywhere
 
 ---
 
@@ -157,11 +242,12 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 
 ### Converter Demo (No Sign-In Required)
 1. Visit `/converter`
-2. Enter Google Doc URL or upload file (HTML, RTF, TXT, DOCX)
+2. Enter Google Doc URL or upload a .docx file
 3. See split-screen preview (original vs converted)
 4. Toggle between "Code" and "Preview" tabs
 5. Copy or download markdown (download requires sign-in)
 6. **Note**: File conversion uses server-side API for reliability (Web Workers removed due to Turbopack compatibility)
+7. **Unified Logic**: Same conversion pipeline used for both Google Docs and .docx files
 
 ---
 
@@ -181,6 +267,8 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 12. **Import path errors** → Fixed relative imports in pipeline stages
 13. **Function name mismatches** → Updated `generateFrontmatter` → `generateFrontMatter`, `createConversionCacheManager` → `createConversionCache`
 14. **Rate limiter API mismatch** → Updated `rateLimiter.wrap()` → `withRateLimit()`
+15. **Multiple converter logics** → Consolidated into single unified converter (`lib/markdown/unified-converter.ts`)
+16. **Unsupported file types** → Dropped HTML, RTF, TXT support (focus on .docx only)
 
 ---
 
@@ -194,10 +282,18 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 
 ## Priority Order
 
-1. **Converter** - Must be perfect (Phases 1-3) ✅ (Web Workers removed - using API fallback)
+1. **Converter** - Must be perfect (Phases 1-3) ✅ (Unified logic, .docx only, API-based)
 2. **Auth** - Must work reliably ✅
 3. **Sync Engine** - Must be reliable ✅
 4. **UI/UX** - Can be improved later
 5. **Advanced features** - Phase 4 only after validation
 
 **The converter IS the product. Everything else is just plumbing.**
+
+### Converter Architecture Notes
+- **Single Source of Truth**: One converter logic (`lib/markdown/unified-converter.ts`) for all use cases
+- **Consistent Output**: Same conversion results for Google Docs and .docx files
+- **Modular Pipeline**: 6 stages (Fetch → Parse → Process → Image → Format → Validate)
+- **File Format Focus**: .docx only (via mammoth.js) - dropped HTML, RTF, TXT support
+- **Demo Mode**: Skip image processing for faster conversions
+- **Caching**: Automatic caching of conversion results (1 hour TTL)
