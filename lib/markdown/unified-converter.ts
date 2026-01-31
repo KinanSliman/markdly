@@ -328,8 +328,8 @@ function sanitizeErrorMessage(message: string): string {
   // Remove sensitive information from error messages
   return message
     .replace(/Bearer\s+[^\s]+/gi, 'Bearer [REDACTED]')
-    .replace(/token[=:]\\s*[^\\s&]+/gi, 'token=[REDACTED]')
-    .replace(/key[=:]\\s*[^\\s&]+/gi, 'key=[REDACTED]');
+    .replace(/token[=:]\s*[^\s&]+/gi, 'token=[REDACTED]')
+    .replace(/key[=:]\s*[^\s&]+/gi, 'key=[REDACTED]');
 }
 
 // ============================================================================
@@ -592,7 +592,7 @@ function processParagraph(
       warnings.push({
         type: 'list',
         message: `List nesting jumped from ${listState.currentNestingLevel} to ${nestingLevel}`,
-        suggestion: 'Don\\'t skip nesting levels',
+        suggestion: "Don't skip nesting levels",
         context: `List ID: ${listId}`,
         severity: 'medium',
       });
@@ -700,7 +700,7 @@ function processTable(table: any): {
         warnings.push({
           type: 'table',
           message: 'Empty table cell detected',
-          suggestion: 'May indicate merged cell - Markdown doesn\\'t support cell merging',
+          suggestion: "May indicate merged cell - Markdown doesn't support cell merging",
           context: `Row ${rowIndex + 1}, Cell ${cellIndex + 1}`,
           severity: 'low',
         });
@@ -789,7 +789,7 @@ function parseHtmlToMarkdown(html: string): {
 
   // Convert headings (priority order for specificity)
   for (let level = 1; level <= 6; level++) {
-    const regex = new RegExp(`<h${level}[^>]*>(.*?)<\\/h${level}>`, 'gi');
+    const regex = new RegExp(`<h${level}[^>]*>(.*?)<\/h${level}>`, 'gi');
     markdown = markdown.replace(regex, (match, content) => {
       const text = sanitizeText(stripHtmlTags(content).trim());
       if (text) {
@@ -801,13 +801,13 @@ function parseHtmlToMarkdown(html: string): {
   }
 
   // Convert bold and italic
-  markdown = markdown.replace(/<strong[^>]*>(.*?)<\\/strong>/gi, '**$1**');
-  markdown = markdown.replace(/<b[^>]*>(.*?)<\\/b>/gi, '**$1**');
-  markdown = markdown.replace(/<em[^>]*>(.*?)<\\/em>/gi, '*$1*');
-  markdown = markdown.replace(/<i[^>]*>(.*?)<\\/i>/gi, '*$1*');
+  markdown = markdown.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
+  markdown = markdown.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
+  markdown = markdown.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
+  markdown = markdown.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
 
   // Convert links with URL sanitization
-  markdown = markdown.replace(/<a[^>]*href=["'](.*?)["'][^>]*>(.*?)<\\/a>/gi, (match, url, text) => {
+  markdown = markdown.replace(/<a[^>]*href=["'](.*?)["'][^>]*>(.*?)<\/a>/gi, (match, url, text) => {
     const sanitizedUrl = sanitizeUrl(url);
     const sanitizedText = sanitizeText(text);
     return `[${sanitizedText}](${sanitizedUrl})`;
@@ -830,26 +830,26 @@ function parseHtmlToMarkdown(html: string): {
   });
 
   // Convert paragraphs
-  markdown = markdown.replace(/<p[^>]*>(.*?)<\\/p>/gi, '$1\n\n');
+  markdown = markdown.replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n');
 
   // Convert line breaks
-  markdown = markdown.replace(/<br\s*\\/?>/gi, '\n');
+  markdown = markdown.replace(/<br\s*\/?>/gi, '\n');
 
   // Convert lists
-  markdown = markdown.replace(/<ul[^>]*>(.*?)<\\/ul>/gis, (match, content) => {
-    return content.replace(/<li[^>]*>(.*?)<\\/li>/gi, (m: string, item: string) => `- ${item.trim()}\n`) + '\n';
+  markdown = markdown.replace(/<ul[^>]*>(.*?)<\/ul>/gis, (match, content) => {
+    return content.replace(/<li[^>]*>(.*?)<\/li>/gi, (m: string, item: string) => `- ${item.trim()}\n`) + '\n';
   });
-  markdown = markdown.replace(/<ol[^>]*>(.*?)<\\/ol>/gis, (match, content) => {
+  markdown = markdown.replace(/<ol[^>]*>(.*?)<\/ol>/gis, (match, content) => {
     let i = 1;
-    return content.replace(/<li[^>]*>(.*?)<\\/li>/gi, (m: string, item: string) => `${i++}. ${item.trim()}\n`) + '\n';
+    return content.replace(/<li[^>]*>(.*?)<\/li>/gi, (m: string, item: string) => `${i++}. ${item.trim()}\n`) + '\n';
   });
 
   // Convert code blocks
-  markdown = markdown.replace(/<code[^>]*>(.*?)<\\/code>/gi, '`$1`');
-  markdown = markdown.replace(/<pre[^>]*>(.*?)<\\/pre>/gis, '```\n$1\n```\n\n');
+  markdown = markdown.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+  markdown = markdown.replace(/<pre[^>]*>(.*?)<\/pre>/gis, '```\n$1\n```\n\n');
 
   // Convert blockquotes
-  markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\\/blockquote>/gis, (match, content) => {
+  markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, (match, content) => {
     return content
       .split('\n')
       .map((line: string) => line.trim() ? `> ${line}` : '')
@@ -857,7 +857,7 @@ function parseHtmlToMarkdown(html: string): {
   });
 
   // Convert tables
-  markdown = markdown.replace(/<table[^>]*>(.*?)<\\/table>/gis, (match, content) => {
+  markdown = markdown.replace(/<table[^>]*>(.*?)<\/table>/gis, (match, content) => {
     const tableResult = convertHtmlTableToMarkdown(content);
     if (tableResult.markdown) {
       tables.push({ rows: tableResult.rows });
@@ -918,7 +918,7 @@ function convertHtmlTableToMarkdown(htmlTable: string): {
   rows: string[][];
 } {
   const rows: string[][] = [];
-  const rowMatches = htmlTable.match(/<tr[^>]*>(.*?)<\\/tr>/gis);
+  const rowMatches = htmlTable.match(/<tr[^>]*>(.*?)<\/tr>/gis);
 
   if (!rowMatches) {
     return { markdown: '', rows: [] };
@@ -926,13 +926,13 @@ function convertHtmlTableToMarkdown(htmlTable: string): {
 
   for (const rowMatch of rowMatches) {
     const cells: string[] = [];
-    const cellMatches = rowMatch.match(/<t[dh][^>]*>(.*?)<\\/t[dh]>/gis);
+    const cellMatches = rowMatch.match(/<t[dh][^>]*>(.*?)<\/t[dh]>/gis);
 
     if (cellMatches) {
       for (const cellMatch of cellMatches) {
         const content = cellMatch
           .replace(/<t[dh][^>]*>/, '')
-          .replace(/<\\/t[dh]>/, '')
+          .replace(/<\/t[dh]>/, '')
           .replace(/<[^>]+>/g, '')
           .replace(/\s+/g, ' ')
           .trim();
@@ -978,59 +978,59 @@ function decodeHtmlEntities(text: string): string {
     '&quot;': '"',
     '&#39;': "'",
     '&apos;': "'",
-    '&copy;': '©',
-    '&reg;': '®',
-    '&trade;': '™',
-    '&euro;': '€',
-    '&pound;': '£',
-    '&yen;': '¥',
-    '&cent;': '¢',
-    '&sect;': '§',
-    '&para;': '¶',
-    '&dagger;': '†',
-    '&Dagger;': '‡',
-    '&bull;': '•',
-    '&hellip;': '…',
-    '&prime;': '′',
-    '&Prime;': '″',
-    '&lsaquo;': '‹',
-    '&rsaquo;': '›',
-    '&laquo;': '«',
-    '&raquo;': '»',
-    '&lsquo;': ''',
-    '&rsquo;': ''',
-    '&ldquo;': '"',
-    '&rdquo;': '"',
-    '&ndash;': '–',
-    '&mdash;': '—',
-    '&iexcl;': '¡',
-    '&iquest;': '¿',
-    '&divide;': '÷',
-    '&times;': '×',
-    '&plusmn;': '±',
-    '&ne;': '≠',
-    '&le;': '≤',
-    '&ge;': '≥',
-    '&infin;': '∞',
-    '&sum;': '∑',
-    '&prod;': '∏',
-    '&radic;': '√',
-    '&int;': '∫',
-    '&part;': '∂',
-    '&deg;': '°',
-    '&micro;': 'µ',
-    '&alpha;': 'α',
-    '&beta;': 'β',
-    '&gamma;': 'γ',
-    '&delta;': 'δ',
-    '&epsilon;': 'ε',
-    '&theta;': 'θ',
-    '&lambda;': 'λ',
-    '&pi;': 'π',
-    '&sigma;': 'σ',
-    '&tau;': 'τ',
-    '&phi;': 'φ',
-    '&omega;': 'ω',
+    '&copy;': 'Â©',
+    '&reg;': 'Â®',
+    '&trade;': 'â„¢',
+    '&euro;': 'â‚¬',
+    '&pound;': 'Â£',
+    '&yen;': 'Â¥',
+    '&cent;': 'Â¢',
+    '&sect;': 'Â§',
+    '&para;': 'Â¶',
+    '&dagger;': 'â€ ',
+    '&Dagger;': 'â€¡',
+    '&bull;': 'â€¢',
+    '&hellip;': 'â€¦',
+    '&prime;': 'â€²',
+    '&Prime;': 'â€³',
+    '&lsaquo;': 'â€¹',
+    '&rsaquo;': 'â€º',
+    '&laquo;': 'Â«',
+    '&raquo;': 'Â»',
+    '&lsquo;': '\u2018',
+    '&rsquo;': '\u2019',
+    '&ldquo;': '\u201C',
+    '&rdquo;': '\u201D',
+    '&ndash;': 'â€“',
+    '&mdash;': 'â€”',
+    '&iexcl;': 'Â¡',
+    '&iquest;': 'Â¿',
+    '&divide;': 'Ã·',
+    '&times;': 'Ã—',
+    '&plusmn;': 'Â±',
+    '&ne;': 'â‰ ',
+    '&le;': 'â‰¤',
+    '&ge;': 'â‰¥',
+    '&infin;': 'âˆž',
+    '&sum;': 'âˆ‘',
+    '&prod;': 'âˆ',
+    '&radic;': 'âˆš',
+    '&int;': 'âˆ«',
+    '&part;': 'âˆ‚',
+    '&deg;': 'Â°',
+    '&micro;': 'Âµ',
+    '&alpha;': 'Î±',
+    '&beta;': 'Î²',
+    '&gamma;': 'Î³',
+    '&delta;': 'Î´',
+    '&epsilon;': 'Îµ',
+    '&theta;': 'Î¸',
+    '&lambda;': 'Î»',
+    '&pi;': 'Ï€',
+    '&sigma;': 'Ïƒ',
+    '&tau;': 'Ï„',
+    '&phi;': 'Ï†',
+    '&omega;': 'Ï‰',
   };
 
   let result = text;
