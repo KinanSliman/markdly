@@ -3,7 +3,13 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/database";
-import { users, sessions, accounts, verificationTokens, workspaces } from "@/db/schema";
+import {
+  users,
+  sessions,
+  accounts,
+  verificationTokens,
+  workspaces,
+} from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { credentialsProvider, hashPassword } from "@/lib/auth/credentials";
 import { trackSignup, trackOAuthConnect } from "@/lib/analytics";
@@ -41,7 +47,8 @@ export const {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
+          scope:
+            "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
           prompt: "consent",
           access_type: "offline",
           include_granted_scopes: "true",
