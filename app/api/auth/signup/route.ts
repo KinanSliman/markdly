@@ -52,6 +52,9 @@ export async function POST(request: NextRequest) {
         signupSource: "email",
         signupDate: new Date(),
         emailVerified: new Date(), // Email verification skipped for demo
+        plan: "free", // Default to free plan
+        syncCount: 0, // Initialize sync count
+        syncResetDate: new Date(), // Initialize reset date
       })
       .returning({ id: users.id, email: users.email, name: users.name });
 

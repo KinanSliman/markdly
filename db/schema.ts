@@ -29,6 +29,10 @@ export const users = pgTable("users", {
   signupDate: timestamp("signup_date").notNull().defaultNow(),
   lastLogin: timestamp("last_login"),
   isAdmin: boolean("is_admin").default(false),
+  plan: text("plan").default("free"), // 'free', 'pro', 'enterprise'
+  // Sync usage tracking for free tier limits
+  syncCount: integer("sync_count").default(0), // Current month's sync count
+  syncResetDate: timestamp("sync_reset_date"), // When the count resets
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

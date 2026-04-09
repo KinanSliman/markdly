@@ -1,6 +1,6 @@
 # Markdly
 
-**Turn Google Docs into GitHub-ready Markdown — automatically.**
+**Turn .docx files into GitHub-ready Markdown — automatically.**
 
 A reliable sync tool for developer relations teams, docs teams, and open-source projects.
 
@@ -79,10 +79,10 @@ npm run db:studio
 /db                     # Database schema
 ```
 
-## Phase 1 MVP Features
+## Features
 
 1. **Auth Setup** - GitHub + Google OAuth
-2. **Google Docs → Markdown** - Robust conversion with tables, code blocks, images
+2. **.docx → Markdown** - Robust conversion with tables, code blocks, images
 3. **GitHub Integration** - Create files, commits, and PRs
 4. **Image Handling** - Cloudinary upload and optimization
 5. **Basic Dashboard** - Connect accounts and trigger syncs

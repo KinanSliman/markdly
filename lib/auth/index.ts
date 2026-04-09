@@ -56,6 +56,7 @@ export const {
         token.id = user.id;
         token.isAdmin = user.isAdmin;
         token.signupSource = user.signupSource;
+        token.plan = user.plan;
       }
       if (account) {
         token.accessToken = account.access_token;
@@ -79,6 +80,7 @@ export const {
           // Update token with latest user data
           token.isAdmin = existingUser[0].isAdmin ?? false;
           token.signupSource = existingUser[0].signupSource ?? "email";
+          token.plan = existingUser[0].plan ?? "free";
 
           // Create workspace for new users (only on first sign-in)
           // Check if user already has a workspace
@@ -104,6 +106,25 @@ export const {
               console.log(`Created workspace for user ${token.id}`);
             }
           }
+
+          // Ensure user has a plan set (for existing users without plan)
+          if (!existingUser[0].plan) {
+            await db
+              .update(users)
+              .set({ plan: "free" })
+              .where(eq(users.id, token.id as string));
+          }
+
+          // Ensure user has sync tracking initialized (for existing users)
+          if (!existingUser[0].syncCount && !existingUser[0].syncResetDate) {
+            await db
+              .update(users)
+              .set({
+                syncCount: 0,
+                syncResetDate: new Date(),
+              })
+              .where(eq(users.id, token.id as string));
+          }
         } catch (error) {
           console.error("Error creating workspace:", error);
           // On DB error, don't break the auth flow
@@ -116,6 +137,7 @@ export const {
         session.user.id = token.id as string;
         session.user.isAdmin = token.isAdmin;
         session.user.signupSource = token.signupSource;
+        session.user.plan = token.plan;
       }
       return session;
     },
@@ -127,19 +149,27 @@ export const {
 
           // Check if this is a new signup (email not verified yet)
           const [existingUser] = await db
-            .select({ emailVerified: users.emailVerified })
+            .select({ emailVerified: users.emailVerified, plan: users.plan })
             .from(users)
             .where(eq(users.email, user.email))
             .limit(1);
 
           const isNewSignup = !existingUser?.emailVerified;
 
+          // Set plan to free for new users
+          const updateData: any = {
+            signupSource: source,
+            emailVerified: new Date(), // OAuth emails are verified
+          };
+
+          // Only set plan if it's a new signup or doesn't have a plan
+          if (isNewSignup || !existingUser?.plan) {
+            updateData.plan = "free";
+          }
+
           await db
             .update(users)
-            .set({
-              signupSource: source,
-              emailVerified: new Date(), // OAuth emails are verified
-            })
+            .set(updateData)
             .where(eq(users.email, user.email));
 
           // Track signup for new users

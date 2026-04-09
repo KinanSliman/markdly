@@ -7,12 +7,14 @@ declare module "next-auth" {
       id: string;
       isAdmin?: boolean;
       signupSource?: "email" | "github" | "google";
+      plan?: "free" | "pro" | "enterprise";
     } & DefaultSession["user"];
   }
 
   interface User extends DefaultUser {
     isAdmin?: boolean;
     signupSource?: "email" | "github" | "google";
+    plan?: "free" | "pro" | "enterprise";
   }
 }
 
@@ -21,5 +23,6 @@ declare module "next-auth/jwt" {
     id: string;
     isAdmin?: boolean;
     signupSource?: "email" | "github" | "google";
+    plan?: "free" | "pro" | "enterprise";
   }
 }

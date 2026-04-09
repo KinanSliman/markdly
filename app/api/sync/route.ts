@@ -4,6 +4,7 @@ import { executeSync } from "@/lib/sync";
 import { db } from "@/lib/database";
 import { syncConfigs, githubConnections, googleConnections, documents, workspaces, accounts } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { checkSyncLimit, incrementSyncCount } from "@/lib/sync/limits";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +17,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Parse request body
+    // 2. Check sync limit
+    const syncLimit = await checkSyncLimit(session.user.id);
+    if (!syncLimit.canSync) {
+      return NextResponse.json(
+        {
+          error: `Sync limit reached. You've used ${syncLimit.limit} syncs this month. Upgrade to Pro for unlimited syncs.`,
+          limitReached: true,
+          remainingSyncs: 0,
+          resetDate: syncLimit.resetDate,
+        },
+        { status: 429 }
+      );
+    }
+
+    // 3. Parse request body
     const body = await request.json();
     const { docId, configId } = body;
 
@@ -152,6 +167,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 8. Increment sync count after successful sync
+    await incrementSyncCount(session.user.id);
+
     return NextResponse.json(
       {
         success: true,
@@ -161,6 +179,12 @@ export async function POST(request: NextRequest) {
           prNumber: result.prNumber,
           prUrl: result.prUrl,
           filesChanged: result.filesChanged,
+        },
+        syncUsage: {
+          currentCount: syncLimit.remainingSyncs === Infinity ? Infinity : syncLimit.limit - syncLimit.remainingSyncs + 1,
+          limit: syncLimit.limit,
+          remainingSyncs: syncLimit.remainingSyncs === Infinity ? Infinity : syncLimit.remainingSyncs - 1,
+          resetDate: syncLimit.resetDate,
         },
       },
       { status: 200 }
@@ -191,6 +215,23 @@ export async function GET(request: NextRequest) {
     const configId = searchParams.get("configId");
     const limit = parseInt(searchParams.get("limit") || "20");
 
+    // 3. Check if requesting sync usage
+    if (searchParams.get("usage") === "true") {
+      const syncLimit = await checkSyncLimit(session.user.id);
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            currentCount: syncLimit.remainingSyncs === Infinity ? Infinity : syncLimit.limit - syncLimit.remainingSyncs,
+            limit: syncLimit.limit,
+            remainingSyncs: syncLimit.remainingSyncs,
+            resetDate: syncLimit.resetDate,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
     if (!configId) {
       return NextResponse.json(
         { error: "Missing required parameter: configId" },
@@ -198,7 +239,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. Fetch sync history
+    // 4. Fetch sync history
     const history = await db
       .select()
       .from(syncHistory)

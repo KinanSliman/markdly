@@ -1,6 +1,19 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, BookOpen, GitBranch, Image as ImageIcon, FileText, Zap } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  ArrowRight,
+  BookOpen,
+  GitBranch,
+  Image as ImageIcon,
+  FileText,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 
 export default function LandingPage() {
@@ -31,8 +44,8 @@ export default function LandingPage() {
           <span className="text-primary"> GitHub-ready Markdown</span>
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          Convert your Word documents to clean Markdown instantly.
-          Images hosted on CDN, tables converted perfectly, ready for GitHub.
+          Convert your Word documents to clean Markdown instantly. Images hosted
+          on CDN, tables converted perfectly, ready for GitHub.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" asChild>
@@ -40,9 +53,6 @@ export default function LandingPage() {
               Try Converter Free
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-          </Button>
-          <Button size="lg" variant="outline" asChild>
-            <Link href="/marketing/docs">View Documentation</Link>
           </Button>
         </div>
       </section>
@@ -55,7 +65,8 @@ export default function LandingPage() {
               <ImageIcon className="h-8 w-8 text-primary mb-2" />
               <CardTitle>Image Handling Done Right</CardTitle>
               <CardDescription>
-                Upload images to Cloudinary with auto-optimization. Generate production-ready CDN links with responsive images.
+                Upload images to Cloudinary with auto-optimization. Generate
+                production-ready CDN links with responsive images.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -65,7 +76,8 @@ export default function LandingPage() {
               <BookOpen className="h-8 w-8 text-primary mb-2" />
               <CardTitle>Robust Conversion</CardTitle>
               <CardDescription>
-                .docx tables, code blocks, headings — all converted accurately to clean Markdown.
+                .docx tables, code blocks, headings — all converted accurately
+                to clean Markdown.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -75,7 +87,8 @@ export default function LandingPage() {
               <GitBranch className="h-8 w-8 text-primary mb-2" />
               <CardTitle>Git-Native Workflow</CardTitle>
               <CardDescription>
-                Auto-create feature branches and pull requests for review. Clean commits with proper attribution.
+                Auto-create feature branches and pull requests for review. Clean
+                commits with proper attribution.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -84,7 +97,9 @@ export default function LandingPage() {
 
       {/* Supported Formats */}
       <section className="max-w-6xl mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold text-center mb-8">Supported Formats</h2>
+        <h2 className="text-3xl font-bold text-center mb-8">
+          Supported Formats
+        </h2>
         <div className="grid md:grid-cols-1 gap-6 max-w-2xl mx-auto">
           <Card>
             <CardHeader>
@@ -93,7 +108,9 @@ export default function LandingPage() {
                 <CardTitle className="text-xl">DOCX (Word)</CardTitle>
               </div>
               <CardDescription>
-                High-quality conversion using mammoth.js. Upload directly without sign-in. Preserves headings, tables, code blocks, and formatting.
+                High-quality conversion using mammoth.js. Upload directly
+                without sign-in. Preserves headings, tables, code blocks, and
+                formatting.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -103,7 +120,9 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border/50 py-8">
         <div className="max-w-6xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© 2025 Markdly. Built for developer relations teams and docs teams.</p>
+          <p>
+            © 2025 Markdly. Built for developer relations teams and docs teams.
+          </p>
         </div>
       </footer>
     </div>

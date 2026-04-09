@@ -1,12 +1,14 @@
-"use client";
-
 import { DocxConverterForm } from "@/components/forms/docx-converter-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/auth";
 
-export default function ConverterPage() {
+export default async function ConverterPage() {
+  const session = await auth();
+  const isAuthenticated = !!session?.user;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-12">
       <div className="max-w-4xl mx-auto px-4">
@@ -29,7 +31,7 @@ export default function ConverterPage() {
         </Card>
 
         {/* Converter Form */}
-        <DocxConverterForm isDemo={true} />
+        <DocxConverterForm isDemo={!isAuthenticated} isAuthenticated={isAuthenticated} />
       </div>
     </div>
   );

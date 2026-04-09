@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmailSignupForm } from "@/components/forms/email-signup-form";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -7,9 +13,9 @@ import { redirect } from "next/navigation";
 export default async function SignupPage() {
   const session = await auth();
 
-  // If already authenticated, redirect to dashboard
+  // If already authenticated, redirect to login
   if (session?.user) {
-    redirect("/dashboard");
+    redirect("/login");
   }
 
   return (
@@ -20,7 +26,7 @@ export default async function SignupPage() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <p className="text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
+              Already have an account?
               <Link
                 href="/auth/signin"
                 className="text-primary font-medium hover:underline"

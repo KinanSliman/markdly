@@ -2,15 +2,16 @@
 
 ## Executive Summary
 
-**Markdly turns Google Docs into GitHub-ready Markdown — automatically.**
+**Markdly turns .docx files into GitHub-ready Markdown — automatically.**
 
-A reliable sync tool for developer relations teams, docs teams, and open-source projects. **Core Value Proposition**: The safest way to get Docs into GitHub.
+A reliable sync tool for developer relations teams, docs teams, and open-source projects. **Core Value Proposition**: The safest way to get word documents into GitHub.
 
 ---
 
 ## ✅ What's Already Completed
 
 ### Core Features
+
 - **Authentication**: GitHub OAuth, Google OAuth, Email/Password with email verification
 - **Dashboard**: Connection status, sync history, tracked documents, settings
 - **Database**: 15 tables (users, sessions, workspaces, github_connections, google_connections, sync_configs, sync_history, documents, api_keys, audit_logs, analytics, verification_tokens, accounts, **performance_metrics**, **performance_alerts**)
@@ -20,6 +21,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Performance Monitoring**: Real-time metrics, trend charts, threshold-based alerts, alert management
 
 ### Converter Features
+
 - **Web-Based Demo**: Homepage converter section - try without sign-in
 - **File Upload**: DOCX files only (uses `mammoth.js` for conversion)
 - **URL Input**: Direct .docx URL conversion support
@@ -31,6 +33,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Raw Text Extraction**: Shows extracted text from .docx files in original preview
 
 ### Phase 1: Reliability & Performance ✅
+
 - **Retry Logic**: Exponential backoff (1s → 2s → 4s → 8s, max 3 retries)
 - **Parallel Image Processing**: Concurrent uploads with rate limiting
 - **Input Validation**: Google Doc IDs, GitHub repos, files, paths
@@ -38,6 +41,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Actionable Error Messages**: Custom error classes with suggestions
 
 ### Phase 2: Conversion Quality ✅
+
 - **Code Block Detection**: 5 heuristics (font size, monospace, indentation, patterns, named styles)
 - **List Nesting**: State tracking across paragraphs, 5+ levels supported
 - **Table Merging Detection**: Identifies merged cells with actionable warnings
@@ -46,6 +50,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Conversion Warnings**: Structured warnings with actionable suggestions
 
 ### Phase 3: Architecture ✅
+
 - **Modular Pipeline**: 6 stages (Fetch → Parse → Process → Image → Format → Validate)
 - **Pipeline Orchestrator**: Stage coordination, error handling, performance metrics
 - **Caching Layer**: 10-100x faster repeated conversions with Redis/in-memory cache
@@ -55,6 +60,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Focused File Support**: .docx only (via mammoth.js) - dropped HTML, RTF, TXT
 
 ### Recent Changes (Architecture & Bug Fixes)
+
 - **Consolidated Converter Logic**: Unified all conversion logic into a single source of truth
   - Created `lib/markdown/unified-converter.ts` with modular pipeline architecture
   - Supports both Google Docs API and .docx file conversion
@@ -93,6 +99,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
   - **Error Sanitization**: Redacts sensitive tokens from error messages
 
 ### Performance Monitoring ✅
+
 - **Metrics Collection**: Conversion times, sync operations, API response times, cache hit rates
 - **Alert System**: Threshold-based alerts with severity levels (critical, warning, info)
 - **Admin Dashboard**: `/admin/performance` with trend charts, metrics cards, and alert summary
@@ -101,6 +108,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Default Thresholds**: 30s conversion, 60s sync, 10s API, 30% cache hit rate, 10% error rate
 
 ### Change Detection ✅
+
 - **Content Hashing**: SHA-256 hashing for document content comparison
 - **Smart Skip Logic**: Automatically skips unchanged content during sync
 - **Change Types**: 7 types (unchanged, modified, title_changed, structure_changed, content_added, content_removed, unknown)
@@ -114,6 +122,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ## Current Status: Phase 3 - Complete
 
 ### Completed Milestones
+
 - **Phase 2 MVP**: Successfully converted real Google Docs with tables, code blocks (7 languages), headings, lists, blockquotes, links, task lists
 - **Phase 3 Milestone 1**: Modular pipeline architecture with 6 discrete stages ✅
 - **Phase 3 Milestone 2**: Web Worker integration for client-side conversion ✅ (removed - incompatible with Turbopack)
@@ -124,6 +133,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Phase 3 Milestone 7**: Focused .docx support (dropped HTML, RTF, TXT) ✅
 
 ### Remaining Milestones
+
 - **Phase 4**: Advanced features (document revision tracking, batch processing, multi-format export, change detection UI)
 
 ---
@@ -131,6 +141,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ## Competitive Advantage
 
 **The Converter is the Product** - Unlike competitors using regex or AI:
+
 - **Structured API parsing** - Google Docs API provides exact document structure
 - **Deterministic rules** - 100% predictable output, no hallucinations
 - **Production-grade reliability** - 99.9% conversion accuracy, zero data loss
@@ -139,10 +150,12 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 - **Consistent Output** - Same conversion results regardless of input source
 
 **Why NOT AI for conversion:**
+
 - ❌ AI hallucinates, is slow, expensive, and unpredictable
 - ✅ Deterministic rules are fast, cheap, and 100% accurate
 
 **Why NOT multiple converter logics:**
+
 - ❌ Multiple codebases = inconsistent output, harder to maintain
 - ✅ Single unified converter = consistent output, easier to maintain
 
@@ -151,6 +164,7 @@ A reliable sync tool for developer relations teams, docs teams, and open-source 
 ## Key Architecture
 
 ### Sync Flow
+
 ```
 User creates sync config → Document tracked → User clicks "Sync"
 → Fetch Google Doc (auto-refresh token if expired)
@@ -161,6 +175,7 @@ User creates sync config → Document tracked → User clicks "Sync"
 ```
 
 ### Premium Markdown Previewer
+
 ```
 Markdown Input → remark-parse → remark-gfm → remark-rehype
 → rehype-highlight (70+ languages) → rehype-slug → rehype-raw
@@ -168,6 +183,7 @@ Markdown Input → remark-parse → remark-gfm → remark-rehype
 ```
 
 ### Unified Converter Architecture
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   Unified Converter API                      │
@@ -226,6 +242,7 @@ Markdown Input → remark-parse → remark-gfm → remark-rehype
 ```
 
 **Key Benefits:**
+
 - **Single Source of Truth**: One converter logic for all use cases
 - **Consistent Output**: Same conversion results regardless of input source
 - **Modular Design**: Pipeline stages can be configured per use case
@@ -256,6 +273,7 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 ## User Flows
 
 ### New User (Email/Password)
+
 1. Homepage → "Start Syncing Free" → `/converter` (try without sign-in)
 2. Or: "Sign In" → `/auth/signin` → Sign up → Verify email → Dashboard
 3. Workspace auto-created in JWT callback
@@ -263,6 +281,7 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 5. Create sync config → Sync documents
 
 ### Converter Demo (No Sign-In Required)
+
 1. Visit `/converter`
 2. Enter Google Doc URL or upload a .docx file
 3. See split-screen preview (original vs converted)
@@ -295,16 +314,6 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 18. **Edge runtime issue** → Removed edge runtime from API route for Node.js module support
 19. **Binary file display** → Extract raw text from .docx for original file preview
 
----
-
-## Success Criteria
-
-**10 paying customers in 3 months** = validation
-
-**Key Metric**: Conversion accuracy > 99.9% with zero data loss
-
----
-
 ## Priority Order
 
 1. **Converter** - Must be perfect (Phases 1-3) ✅ (Unified logic, .docx only, API-based)
@@ -316,6 +325,7 @@ GOOGLE_DEMO_ACCESS_TOKEN=your_google_access_token  # Required for Google Doc con
 **The converter IS the product. Everything else is just plumbing.**
 
 ### Converter Architecture Notes
+
 - **Single Source of Truth**: One converter logic (`lib/markdown/unified-converter.ts`) for all use cases
 - **Consistent Output**: Same conversion results for Google Docs and .docx files
 - **Modular Pipeline**: 6 stages (Fetch → Parse → Process → Image → Format → Validate)

@@ -4,6 +4,8 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
+CLAUDE.md
+pnpm-workspace.yaml
 
 # Build output
 .next/

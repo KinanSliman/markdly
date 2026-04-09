@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, Link, Loader2, AlertCircle, CheckCircle2, Copy, Download, Globe, FileUp } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Copy, Download, Globe, FileUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MarkdownPreview } from '@/components/markdown-preview';
 import { Label } from '@/components/ui/label';
@@ -19,10 +20,11 @@ interface ConversionResult {
 
 interface DocxConverterFormProps {
   isDemo?: boolean;
+  isAuthenticated?: boolean;
   onConvert?: (result: ConversionResult) => void;
 }
 
-export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFormProps) {
+export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onConvert }: DocxConverterFormProps) {
   const [activeTab, setActiveTab] = useState<'url' | 'upload'>('url');
   const [url, setUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -243,6 +245,28 @@ export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFo
 
       {result && (
         <div className="space-y-4">
+          {/* Download Button - Centered Above Split Screen */}
+          <div className="flex flex-col items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownload}
+              disabled={isConverting || !isAuthenticated}
+              className="w-full max-w-xs"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download Markdown
+            </Button>
+            {!isAuthenticated && (
+              <p className="text-sm text-muted-foreground">
+                <Link href="/auth/signin" className="text-primary hover:underline">
+                  Sign in
+                </Link>{" "}
+                to download your converted file
+              </p>
+            )}
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -256,15 +280,6 @@ export function DocxConverterForm({ isDemo = false, onConvert }: DocxConverterFo
                   >
                     <Copy className="w-4 h-4 mr-2" />
                     {copied ? 'Copied!' : 'Copy'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownload}
-                    disabled={isConverting}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
                   </Button>
                 </div>
               </CardTitle>

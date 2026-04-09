@@ -47,6 +47,7 @@ export const credentialsProvider = Credentials({
       image: user.image,
       isAdmin: user.isAdmin,
       signupSource: user.signupSource,
+      plan: user.plan,
     };
   },
 });
