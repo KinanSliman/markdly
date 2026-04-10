@@ -1,9 +1,16 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import * as schema from "@/db/schema";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import * as schema from "@/db/schema"; // Ensure this path matches your file structure
 
-const connectionString = process.env.POSTGRES_URL!;
+// Use the POOLED connection string for your app logic
+const connectionString = process.env.POSTGRES_URL;
 
-// Disable prefetch as it is not supported for "Transaction" pool mode
-const client = postgres(connectionString, { prepare: false });
-export const db = drizzle(client, { schema });
+if (!connectionString) {
+  throw new Error("POSTGRES_URL is not defined in environment variables");
+}
+
+// Create the Neon HTTP connection
+const sql = neon(connectionString);
+
+// Initialize Drizzle with the Neon HTTP driver
+export const db = drizzle(sql, { schema });
