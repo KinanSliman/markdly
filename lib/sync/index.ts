@@ -1,5 +1,11 @@
 import { db } from "@/lib/database";
-import { syncHistory, documents, syncConfigs, githubConnections, googleConnections } from "@/db/schema";
+import {
+  syncHistory,
+  documents,
+  syncConfigs,
+  githubConnections,
+  googleConnections,
+} from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import {
@@ -8,14 +14,23 @@ import {
   fixHeadingHierarchy,
   cleanupWhitespace,
   validateMarkdown,
-  normalizeListMarkers
-} from "@/lib/markdown/converter";
-import { generateFrontMatter, wrapWithFrontMatter, getTemplateByFramework, extractVariablesFromContent } from "@/lib/markdown/frontmatter";
+  normalizeListMarkers,
+} from "@/lib/markdown/unified-converter";
+import {
+  generateFrontMatter,
+  wrapWithFrontMatter,
+  getTemplateByFramework,
+  extractVariablesFromContent,
+} from "@/lib/markdown/frontmatter";
 import { createGitHubWorkflow } from "@/lib/github";
 import { getGoogleDoc, refreshGoogleAccessToken } from "@/lib/google";
 import { trackSync } from "@/lib/analytics";
 import { hashGoogleDoc } from "@/lib/utils/hashing";
-import { detectDocumentChanges, shouldSkipSync, getChangeDescription } from "@/lib/sync/change-detector";
+import {
+  detectDocumentChanges,
+  shouldSkipSync,
+  getChangeDescription,
+} from "@/lib/sync/change-detector";
 
 export interface SyncResult {
   success: boolean;
@@ -40,7 +55,12 @@ export interface SyncOptions {
  * Main sync execution function
  * Orchestrates the entire workflow: Google Doc → Images to Cloudinary → Markdown → GitHub PR
  */
-export async function executeSync({ docId, configId, userId, skipUnchanged = true }: SyncOptions): Promise<SyncResult> {
+export async function executeSync({
+  docId,
+  configId,
+  userId,
+  skipUnchanged = true,
+}: SyncOptions): Promise<SyncResult> {
   const startTime = new Date();
   let syncHistoryId: string | undefined;
 
@@ -100,22 +120,34 @@ export async function executeSync({ docId, configId, userId, skipUnchanged = tru
     let converted;
 
     // Determine Cloudinary folder based on sync config
-    const cloudinaryFolder = syncConfig.imageStrategy === "cloudinary"
-      ? `markdly/${syncConfig.name}`
-      : undefined;
+    const cloudinaryFolder =
+      syncConfig.imageStrategy === "cloudinary"
+        ? `markdly/${syncConfig.name}`
+        : undefined;
 
     try {
       googleDoc = await getGoogleDoc(docId, googleToken, !isAccessToken);
-      converted = await convertGoogleDocToMarkdown(docId, googleToken, !isAccessToken, cloudinaryFolder);
+      converted = await convertGoogleDocToMarkdown(
+        docId,
+        googleToken,
+        !isAccessToken,
+        cloudinaryFolder,
+      );
     } catch (error) {
       // If the error is "Invalid Credentials", try refreshing the access token
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes("Invalid Credentials") || errorMessage.includes("invalid_grant")) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage.includes("Invalid Credentials") ||
+        errorMessage.includes("invalid_grant")
+      ) {
         console.log("Google access token expired, refreshing...");
 
         if (googleConn.refreshToken) {
           try {
-            const { access_token } = await refreshGoogleAccessToken(googleConn.refreshToken);
+            const { access_token } = await refreshGoogleAccessToken(
+              googleConn.refreshToken,
+            );
 
             // Update the Google connection with the new access token
             await db
@@ -127,12 +159,21 @@ export async function executeSync({ docId, configId, userId, skipUnchanged = tru
             googleToken = access_token;
             isAccessToken = true;
             googleDoc = await getGoogleDoc(docId, googleToken, true);
-            converted = await convertGoogleDocToMarkdown(docId, googleToken, true, cloudinaryFolder);
+            converted = await convertGoogleDocToMarkdown(
+              docId,
+              googleToken,
+              true,
+              cloudinaryFolder,
+            );
           } catch (refreshError) {
-            throw new Error(`Failed to refresh Google access token: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
+            throw new Error(
+              `Failed to refresh Google access token: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`,
+            );
           }
         } else {
-          throw new Error("Google access token expired and no refresh token available. Please reconnect your Google account.");
+          throw new Error(
+            "Google access token expired and no refresh token available. Please reconnect your Google account.",
+          );
         }
       } else {
         throw error;
@@ -158,16 +199,22 @@ export async function executeSync({ docId, configId, userId, skipUnchanged = tru
     }
 
     // 11. Generate front matter
-    const variables = extractVariablesFromContent(markdownContent, googleDoc.name);
-    const template = syncConfig.frontmatterTemplate || getTemplateByFramework(syncConfig.framework || "nextjs");
+    const variables = extractVariablesFromContent(
+      markdownContent,
+      googleDoc.name,
+    );
+    const template =
+      syncConfig.frontmatterTemplate ||
+      getTemplateByFramework(syncConfig.framework || "nextjs");
     const frontMatter = generateFrontMatter(template, variables);
     const finalContent = wrapWithFrontMatter(markdownContent, frontMatter);
 
     // 12. Generate file path
-    const fileName = googleDoc.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") + ".md";
+    const fileName =
+      googleDoc.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") + ".md";
     const filePath = `${syncConfig.outputPath || "content/"}${fileName}`;
 
     // 13. CHANGE DETECTION - Check if content has changed
@@ -179,20 +226,22 @@ export async function executeSync({ docId, configId, userId, skipUnchanged = tru
     const changeResult = detectDocumentChanges(
       existingDoc?.metadata?.content || null,
       finalContent,
-      existingDoc ? {
-        title: existingDoc.title,
-        contentHash: existingDoc.contentHash,
-        paragraphCount: existingDoc.metadata?.paragraphCount,
-        tableCount: existingDoc.metadata?.tableCount,
-        imageCount: existingDoc.metadata?.imageCount,
-      } : null,
+      existingDoc
+        ? {
+            title: existingDoc.title,
+            contentHash: existingDoc.contentHash,
+            paragraphCount: existingDoc.metadata?.paragraphCount,
+            tableCount: existingDoc.metadata?.tableCount,
+            imageCount: existingDoc.metadata?.imageCount,
+          }
+        : null,
       {
         title: googleDoc.name,
         paragraphCount: converted.metadata?.paragraphCount,
         tableCount: converted.metadata?.tableCount,
         imageCount: converted.metadata?.imageCount,
       },
-      docId
+      docId,
     );
 
     const shouldSkip = shouldSkipSync(changeResult, { skipUnchanged });
@@ -292,26 +341,24 @@ export async function executeSync({ docId, configId, userId, skipUnchanged = tru
         })
         .where(eq(documents.googleDocId, docId));
     } else {
-      await db
-        .insert(documents)
-        .values({
-          syncConfigId: configId,
-          googleDocId: docId,
-          title: googleDoc.name,
-          lastSynced: new Date(),
-          lastModified: new Date(),
-          contentHash: changeResult.hashComparison.newHash,
-          contentSize: finalContent.length,
-          metadata: {
-            filePath,
-            commitSha,
-            prNumber,
-            prUrl,
-            paragraphCount: converted.metadata?.paragraphCount,
-            tableCount: converted.metadata?.tableCount,
-            imageCount: converted.metadata?.imageCount,
-          },
-        });
+      await db.insert(documents).values({
+        syncConfigId: configId,
+        googleDocId: docId,
+        title: googleDoc.name,
+        lastSynced: new Date(),
+        lastModified: new Date(),
+        contentHash: changeResult.hashComparison.newHash,
+        contentSize: finalContent.length,
+        metadata: {
+          filePath,
+          commitSha,
+          prNumber,
+          prUrl,
+          paragraphCount: converted.metadata?.paragraphCount,
+          tableCount: converted.metadata?.tableCount,
+          imageCount: converted.metadata?.imageCount,
+        },
+      });
     }
 
     // 16. Update sync history with success
@@ -347,7 +394,8 @@ export async function executeSync({ docId, configId, userId, skipUnchanged = tru
       changeType: changeResult.summary.changeType,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
 
     // Update sync history with failure
     if (syncHistoryId) {
@@ -432,9 +480,9 @@ export async function getSyncStats(syncConfigId: string) {
 
   const stats = {
     total: history.length,
-    successful: history.filter(h => h.status === 'success').length,
-    failed: history.filter(h => h.status === 'failed').length,
-    skipped: history.filter(h => h.status === 'skipped').length,
+    successful: history.filter((h) => h.status === "success").length,
+    failed: history.filter((h) => h.status === "failed").length,
+    skipped: history.filter((h) => h.status === "skipped").length,
     byChangeType: {} as Record<string, number>,
     lastSync: history[0]?.startedAt,
   };
@@ -442,7 +490,8 @@ export async function getSyncStats(syncConfigId: string) {
   // Count by change type
   for (const entry of history) {
     if (entry.changeType) {
-      stats.byChangeType[entry.changeType] = (stats.byChangeType[entry.changeType] || 0) + 1;
+      stats.byChangeType[entry.changeType] =
+        (stats.byChangeType[entry.changeType] || 0) + 1;
     }
   }
 
