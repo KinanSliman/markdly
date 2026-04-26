@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, Loader2, AlertCircle, CheckCircle2, Copy, Download, Globe, FileUp } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MarkdownPreview } from '@/components/markdown-preview';
@@ -35,11 +35,20 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
 
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB — must match server limit
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (!selectedFile.name.toLowerCase().endsWith('.docx')) {
         setError('Please select a .docx file');
+        setFile(null);
+        return;
+      }
+      if (selectedFile.size > MAX_FILE_BYTES) {
+        setError(
+          `File is too large (${(selectedFile.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`
+        );
         setFile(null);
         return;
       }
@@ -158,22 +167,24 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
             {/* Input Method Selection */}
             <div className="space-y-3">
               <Label>Input Method</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <Button
                   variant={activeTab === 'url' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('url')}
                   disabled={isConverting}
+                  className="min-w-0"
                 >
-                  <Globe className="w-4 h-4 mr-2" />
-                  URL
+                  <Globe className="w-4 h-4 mr-1.5 sm:mr-2 shrink-0" />
+                  <span className="truncate">URL</span>
                 </Button>
                 <Button
                   variant={activeTab === 'upload' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('upload')}
                   disabled={isConverting}
+                  className="min-w-0"
                 >
-                  <FileUp className="w-4 h-4 mr-2" />
-                  Upload
+                  <FileUp className="w-4 h-4 mr-1.5 sm:mr-2 shrink-0" />
+                  <span className="truncate">Upload</span>
                 </Button>
               </div>
             </div>
@@ -269,14 +280,15 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Conversion Result</span>
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span className="text-base sm:text-lg">Conversion Result</span>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleCopy}
                     disabled={isConverting}
+                    className="w-full sm:w-auto"
                   >
                     <Copy className="w-4 h-4 mr-2" />
                     {copied ? 'Copied!' : 'Copy'}
@@ -290,19 +302,19 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
               )}
             </CardHeader>
             <CardContent>
-              {/* Split View - Full Width */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              {/* Split View - Stacks on mobile/tablet, side-by-side on lg+ */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-3">
                 {/* Left Side - Original File */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-sm">Original File</h3>
-                    <span className="text-xs text-muted-foreground">
+                <div className="space-y-2 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold text-sm shrink-0">Original File</h3>
+                    <span className="text-xs text-muted-foreground truncate">
                       {activeTab === 'upload' ? file?.name : 'URL'}
                     </span>
                   </div>
-                  <div className="bg-muted p-3 rounded-lg overflow-auto max-h-[500px] text-sm font-mono">
+                  <div className="bg-muted p-3 rounded-lg overflow-auto max-h-[300px] sm:max-h-[400px] lg:max-h-[500px] text-sm font-mono">
                     {originalContent ? (
-                      <pre>{originalContent}</pre>
+                      <pre className="whitespace-pre-wrap break-words">{originalContent}</pre>
                     ) : (
                       'Loading...'
                     )}
@@ -310,9 +322,9 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
                 </div>
 
                 {/* Right Side - Converted Markdown */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-sm">Converted Markdown</h3>
+                <div className="space-y-2 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold text-sm shrink-0">Converted Markdown</h3>
                     <Button
                       variant="outline"
                       size="sm"
@@ -321,13 +333,17 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
                       {showPreview ? 'Show Code' : 'Show Preview'}
                     </Button>
                   </div>
-                  {showPreview ? (
-                    <MarkdownPreview content={result.content} />
-                  ) : (
-                    <pre className="bg-muted p-3 rounded-lg overflow-auto max-h-[500px] text-sm font-mono">
-                      {result.content}
-                    </pre>
-                  )}
+                  <div className="overflow-auto max-h-[300px] sm:max-h-[400px] lg:max-h-[500px] bg-muted/40 rounded-lg">
+                    {showPreview ? (
+                      <div className="p-3">
+                        <MarkdownPreview content={result.content} />
+                      </div>
+                    ) : (
+                      <pre className="bg-muted p-3 rounded-lg text-sm font-mono whitespace-pre-wrap break-words">
+                        {result.content}
+                      </pre>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -357,20 +373,20 @@ export function DocxConverterForm({ isDemo = false, isAuthenticated = false, onC
           {result.metrics && (
             <Card>
               <CardHeader>
-                <CardTitle>Performance Metrics</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Performance Metrics</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
+                  <div className="flex justify-between sm:block min-w-0">
                     <span className="text-muted-foreground">Total Time:</span>
-                    <span className="font-mono ml-2">
+                    <span className="font-mono sm:ml-2 truncate">
                       {result.metrics.totalTime.toFixed(2)}ms
                     </span>
                   </div>
                   {Object.entries(result.metrics.stages).map(([stage, time]) => (
-                    <div key={stage}>
+                    <div key={stage} className="flex justify-between sm:block min-w-0">
                       <span className="text-muted-foreground capitalize">{stage}:</span>
-                      <span className="font-mono ml-2">{time.toFixed(2)}ms</span>
+                      <span className="font-mono sm:ml-2 truncate">{time.toFixed(2)}ms</span>
                     </div>
                   ))}
                 </div>

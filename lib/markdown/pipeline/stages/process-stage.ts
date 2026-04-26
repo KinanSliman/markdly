@@ -313,7 +313,7 @@ export class ProcessStage implements PipelineStage {
   /**
    * Processes a regular paragraph
    */
-  private processRegularParagraph(paragraph: any): ContentBlock {
+  private processRegularParagraph(paragraph: any): ContentBlock | null {
     const text = this.extractText(paragraph, false);
 
     if (!text.trim()) {
@@ -699,7 +699,7 @@ export class ProcessStage implements PipelineStage {
     }
 
     // Shell/Bash patterns
-    if (/^#!/ || /^\$[a-zA-Z_]/ || /echo\s+|cd\s+|ls\s+/.test(trimmed)) {
+    if (/^#!/.test(trimmed) || /^\$[a-zA-Z_]/.test(trimmed) || /echo\s+|cd\s+|ls\s+/.test(trimmed)) {
       return 'bash';
     }
 

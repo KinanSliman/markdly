@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { executeSync } from "@/lib/sync";
 import { db } from "@/lib/database";
-import { syncConfigs, githubConnections, googleConnections, documents, workspaces, accounts } from "@/db/schema";
+import { syncConfigs, githubConnections, googleConnections, documents, workspaces, accounts, syncHistory } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { checkSyncLimit, incrementSyncCount } from "@/lib/sync/limits";
 

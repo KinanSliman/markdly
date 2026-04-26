@@ -56,14 +56,14 @@ export default async function AdminAnalyticsPage() {
   return (
     <DashboardShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Analytics</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Analytics</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               User activity and event tracking
             </p>
           </div>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href="/admin">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
@@ -160,13 +160,13 @@ export default async function AdminAnalyticsPage() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      User: {event.userId.slice(0, 8)}...
+                      User: {event.userId ? `${event.userId.slice(0, 8)}...` : "—"}
                     </div>
-                    {event.metadata && (
+                    {event.metadata ? (
                       <div className="text-xs mt-1 font-mono">
                         {JSON.stringify(event.metadata)}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>

@@ -1,6 +1,6 @@
 import { db } from "@/lib/database";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // Free tier limit: 5 syncs per month
 export const FREE_SYNC_LIMIT = 5;
@@ -73,7 +73,7 @@ export async function incrementSyncCount(userId: string): Promise<void> {
   await db
     .update(users)
     .set({
-      syncCount: (users.syncCount ?? 0) + 1,
+      syncCount: sql`COALESCE(${users.syncCount}, 0) + 1`,
     })
     .where(eq(users.id, userId));
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/database";
 import { users, syncHistory, workspaces } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, isNotNull } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         count: count(),
       })
       .from(syncHistory)
-      .where(syncHistory.userId.isNotNull())
+      .where(isNotNull(syncHistory.userId))
       .groupBy(syncHistory.userId);
 
     // Get user configs count (via workspaces)

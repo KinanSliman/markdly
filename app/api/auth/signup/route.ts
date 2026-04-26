@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword } from "@/lib/auth/credentials";
 import { trackSignup } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     await trackSignup(newUser.id, "email");
 
     // Note: Email verification is skipped for demo purposes
-    console.log(`New user created: ${newUser.email}`);
+    logger.info(`New user created: ${newUser.email}`);
 
     return NextResponse.json(
       {

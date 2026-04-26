@@ -10,10 +10,10 @@ export default async function ConverterPage() {
   const isAuthenticated = !!session?.user;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-12">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-6 sm:py-12">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4">
         {/* Back Button */}
-        <Button variant="ghost" asChild className="mb-6">
+        <Button variant="ghost" asChild className="mb-4 sm:mb-6">
           <Link href="/">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
@@ -21,10 +21,12 @@ export default async function ConverterPage() {
         </Button>
 
         {/* Header */}
-        <Card className="mb-8">
+        <Card className="mb-6 sm:mb-8">
           <CardHeader>
-            <CardTitle className="text-3xl text-center">Convert .docx to Markdown</CardTitle>
-            <CardDescription className="text-center">
+            <CardTitle className="text-xl sm:text-2xl md:text-3xl text-center">
+              Convert .docx to Markdown
+            </CardTitle>
+            <CardDescription className="text-center text-sm sm:text-base">
               Upload a .docx file or enter a URL to convert to GitHub-ready Markdown
             </CardDescription>
           </CardHeader>

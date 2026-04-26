@@ -71,7 +71,7 @@ export interface ConversionWarning {
     | "security";
   message: string;
   suggestion: string;
-  context?: string;
+  context?: string | Record<string, unknown>;
   severity?: "low" | "medium" | "high";
 }
 
@@ -241,10 +241,10 @@ export async function convertDocxToMarkdown(
     }
 
     // Convert .docx to HTML using mammoth.js
-    const htmlResult = await mammoth.convertToHtml({
-      buffer,
-      ignoreEmptyParagraphs: false, // Keep structure
-    });
+    const htmlResult = await mammoth.convertToHtml(
+      { buffer },
+      { ignoreEmptyParagraphs: false }
+    );
     let html = htmlResult.value;
     stages.convert = performance.now() - convertStart;
 
@@ -361,7 +361,7 @@ async function fetchGoogleDoc(
     oauth2Client.setCredentials({ refresh_token: token });
   }
 
-  const docs = google.docs({ version: "v1", auth: oauth2Client });
+  const docs = google.docs({ version: "v1", auth: oauth2Client as any });
 
   const response = await docs.documents.get({
     documentId: docId,
@@ -1634,7 +1634,165 @@ function formatMarkdown(markdown: string): {
   };
 }
 
-function validateMarkdown(content: string): {
+/**
+ * Ensure code fences are well-formed:
+ * - Trim trailing whitespace inside code blocks
+ * - Collapse 4+ blank lines inside fences to 2
+ * - Make sure each ``` opener is on its own line
+ */
+export function processCodeBlocks(content: string): string {
+  // Make sure ``` always starts at line beginning
+  let processed = content.replace(/([^\n])```/g, "$1\n```");
+  processed = processed.replace(/```([^\n])/g, "```\n$1");
+
+  // Walk fenced blocks and trim trailing whitespace per line
+  processed = processed.replace(
+    /```([a-zA-Z0-9_+\-]*)\n([\s\S]*?)```/g,
+    (_match, lang: string, body: string) => {
+      const trimmedBody = body
+        .split("\n")
+        .map((line) => line.replace(/[ \t]+$/g, ""))
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n");
+      return `\`\`\`${lang}\n${trimmedBody}\`\`\``;
+    }
+  );
+
+  return processed;
+}
+
+/**
+ * Fix heading hierarchy so the document has at most one H1 and never skips
+ * levels (e.g. H1 → H3 becomes H1 → H2). Code blocks are skipped.
+ */
+export function fixHeadingHierarchy(content: string): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+
+  let inFence = false;
+  let lastLevel = 0;
+  let seenH1 = false;
+
+  for (const line of lines) {
+    if (/^```/.test(line)) {
+      inFence = !inFence;
+      result.push(line);
+      continue;
+    }
+
+    if (inFence) {
+      result.push(line);
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (!headingMatch) {
+      result.push(line);
+      continue;
+    }
+
+    let level = headingMatch[1].length;
+    const text = headingMatch[2];
+
+    // Demote duplicate H1s to H2
+    if (level === 1) {
+      if (seenH1) {
+        level = 2;
+      } else {
+        seenH1 = true;
+      }
+    }
+
+    // Don't allow level jumps greater than +1
+    if (lastLevel > 0 && level > lastLevel + 1) {
+      level = lastLevel + 1;
+    }
+
+    lastLevel = level;
+    result.push(`${"#".repeat(level)} ${text}`);
+  }
+
+  return result.join("\n");
+}
+
+/**
+ * Normalize list markers:
+ * - Bullet lists → use "-" consistently
+ * - Numbered lists → renumber sequentially within each contiguous block
+ * Code blocks are skipped.
+ */
+export function normalizeListMarkers(content: string): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+
+  let inFence = false;
+  // Track numbering state per indent level
+  const numbering = new Map<number, number>();
+  let lastIndentSeen: number | null = null;
+  let lastWasNumbered = false;
+
+  for (const line of lines) {
+    if (/^```/.test(line)) {
+      inFence = !inFence;
+      result.push(line);
+      numbering.clear();
+      lastWasNumbered = false;
+      continue;
+    }
+
+    if (inFence) {
+      result.push(line);
+      continue;
+    }
+
+    // Bullet: -, *, or +
+    const bulletMatch = line.match(/^(\s*)([-*+])\s+(.*)$/);
+    if (bulletMatch) {
+      const [, indent, , rest] = bulletMatch;
+      result.push(`${indent}- ${rest}`);
+      numbering.clear();
+      lastWasNumbered = false;
+      lastIndentSeen = indent.length;
+      continue;
+    }
+
+    // Numbered: "1." / "12)" etc.
+    const numMatch = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
+    if (numMatch) {
+      const [, indent, , rest] = numMatch;
+      const indentLen = indent.length;
+      const next = (numbering.get(indentLen) ?? 0) + 1;
+      numbering.set(indentLen, next);
+
+      // Reset deeper levels
+      for (const key of Array.from(numbering.keys())) {
+        if (key > indentLen) numbering.delete(key);
+      }
+
+      result.push(`${indent}${next}. ${rest}`);
+      lastWasNumbered = true;
+      lastIndentSeen = indentLen;
+      continue;
+    }
+
+    // Blank line between numbered items — keep numbering state
+    if (line.trim() === "" && lastWasNumbered) {
+      result.push(line);
+      continue;
+    }
+
+    // Anything else breaks the numbered run
+    if (line.trim() !== "") {
+      numbering.clear();
+      lastWasNumbered = false;
+    }
+    result.push(line);
+  }
+
+  return result.join("\n");
+}
+
+export function validateMarkdown(content: string): {
   valid: boolean;
   warnings: ConversionWarning[];
 } {
@@ -1694,7 +1852,7 @@ function validateMarkdown(content: string): {
 /**
  * ✅ IMPROVED: cleanupWhitespace with non-breaking space removal
  */
-function cleanupWhitespace(content: string): string {
+export function cleanupWhitespace(content: string): string {
   let cleaned = content;
 
   // Replace non-breaking spaces (U+00A0) with regular spaces
@@ -2050,9 +2208,18 @@ export async function getConversionResultFromCache(
 
     if (cached) {
       // Parse stored metadata to reconstruct full output
-      const images = cached.metadata.images || [];
-      const headings = cached.metadata.headings || [];
-      const tables = cached.metadata.tables || [];
+      const meta = cached.metadata as any;
+      const images = (Array.isArray(meta.images) ? meta.images : []) as Array<{
+        url: string;
+        alt: string;
+      }>;
+      const headings = (Array.isArray(meta.headings) ? meta.headings : []) as Array<{
+        text: string;
+        level: number;
+      }>;
+      const tables = (Array.isArray(meta.tables) ? meta.tables : []) as Array<{
+        rows: string[][];
+      }>;
 
       return {
         title: cached.metadata.title,
@@ -2060,7 +2227,7 @@ export async function getConversionResultFromCache(
         images,
         headings,
         tables,
-        warnings: cached.warnings,
+        warnings: (cached as any).warnings || cached.metadata.warnings || [],
         metrics: { ...cached.metrics, cached: true },
         cached: true,
       };
@@ -2103,9 +2270,13 @@ export async function setConversionResultInCache(
           images: result.images,
           headings: result.headings,
           tables: result.tables,
+          warnings: result.warnings,
         } as any,
-        warnings: result.warnings,
-        metrics: result.metrics || { totalTime: 0, stages: {} },
+        metrics: {
+          totalTime: result.metrics?.totalTime || 0,
+          stages: result.metrics?.stages || {},
+          cached: result.metrics?.cached ?? false,
+        },
         cacheInfo: {
           cachedAt: Date.now(),
           ttl: 3600000,

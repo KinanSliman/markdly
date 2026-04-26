@@ -165,7 +165,9 @@ export class MetricsCollector {
   private trimStorage(key: keyof MetricsStorage): void {
     const storage = this.storage[key];
     if (Array.isArray(storage) && storage.length > this.maxStorageSize) {
-      this.storage[key] = storage.slice(-this.maxStorageSize);
+      (this.storage as unknown as Record<string, unknown[]>)[key] = storage.slice(
+        -this.maxStorageSize
+      );
     }
   }
 
@@ -205,7 +207,7 @@ export class MetricsCollector {
    */
   getCache(timeRange: TimeRange = '24h'): CacheMetrics[] {
     const cutoff = this.getTimeRangeCutoff(timeRange);
-    return this.storage.cache.filter(r => r.timestamp >= cutoff);
+    return this.storage.cache.filter(r => (r.timestamp ?? 0) >= cutoff);
   }
 
   /**
@@ -355,7 +357,7 @@ export class MetricsCollector {
         }
         case 'cache_hit_rate': {
           const cache = this.storage.cache.filter(
-            c => c.timestamp >= currentTime && c.timestamp < nextTime
+            c => (c.timestamp ?? 0) >= currentTime && (c.timestamp ?? 0) < nextTime
           );
           if (cache.length > 0) {
             value = cache.reduce((sum, c) => sum + c.hitRate, 0) / cache.length * 100;

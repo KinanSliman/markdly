@@ -45,9 +45,17 @@ export const credentialsProvider = Credentials({
       email: user.email,
       name: user.name,
       image: user.image,
-      isAdmin: user.isAdmin,
-      signupSource: user.signupSource,
-      plan: user.plan,
+      isAdmin: user.isAdmin ?? undefined,
+      signupSource: (user.signupSource ?? undefined) as
+        | "email"
+        | "github"
+        | "google"
+        | undefined,
+      plan: (user.plan ?? undefined) as
+        | "free"
+        | "pro"
+        | "enterprise"
+        | undefined,
     };
   },
 });

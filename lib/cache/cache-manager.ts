@@ -72,7 +72,7 @@ export const defaultCacheKeyGenerator: CacheKeyGenerator = (
 export class InMemoryCacheBackend implements CacheBackend {
   private cache: Map<string, CacheEntry<any>> = new Map();
   private options: Required<CacheOptions>;
-  private stats: CacheStats;
+  private _stats: CacheStats;
   private cleanupTimer: NodeJS.Timeout | null = null;
   private listeners: Array<(event: CacheEvent) => void> = [];
 
@@ -82,9 +82,10 @@ export class InMemoryCacheBackend implements CacheBackend {
       defaultTTL: options.defaultTTL || 3600000, // 1 hour
       enableMetrics: options.enableMetrics !== false,
       cleanupInterval: options.cleanupInterval || 60000, // 1 minute
+      redisUrl: options.redisUrl || '',
     };
 
-    this.stats = {
+    this._stats = {
       hits: 0,
       misses: 0,
       sets: 0,
@@ -111,7 +112,7 @@ export class InMemoryCacheBackend implements CacheBackend {
     const entry = this.cache.get(key);
 
     if (!entry) {
-      this.stats.misses++;
+      this._stats.misses++;
       this.emit('miss', key);
       return null;
     }
@@ -119,7 +120,7 @@ export class InMemoryCacheBackend implements CacheBackend {
     // Check if expired
     if (entry.expiresAt && Date.now() > entry.expiresAt) {
       this.cache.delete(key);
-      this.stats.misses++;
+      this._stats.misses++;
       this.emit('miss', key);
       return null;
     }
@@ -128,7 +129,7 @@ export class InMemoryCacheBackend implements CacheBackend {
     entry.accessCount++;
     entry.lastAccessed = Date.now();
 
-    this.stats.hits++;
+    this._stats.hits++;
     this.emit('hit', key);
     return entry;
   }
@@ -160,9 +161,9 @@ export class InMemoryCacheBackend implements CacheBackend {
 
     this.cache.set(key, entry);
 
-    this.stats.sets++;
-    this.stats.size = this.cache.size;
-    this.stats.memoryUsage += size;
+    this._stats.sets++;
+    this._stats.size = this.cache.size;
+    this._stats.memoryUsage += size;
 
     this.emit('set', key, value);
   }
@@ -173,13 +174,13 @@ export class InMemoryCacheBackend implements CacheBackend {
   async delete(key: string): Promise<boolean> {
     const entry = this.cache.get(key);
     if (entry) {
-      this.stats.memoryUsage -= entry.size;
+      this._stats.memoryUsage -= entry.size;
     }
 
     const deleted = this.cache.delete(key);
     if (deleted) {
-      this.stats.deletes++;
-      this.stats.size = this.cache.size;
+      this._stats.deletes++;
+      this._stats.size = this.cache.size;
       this.emit('delete', key);
     }
 
@@ -207,7 +208,7 @@ export class InMemoryCacheBackend implements CacheBackend {
    */
   async clear(): Promise<void> {
     this.cache.clear();
-    this.stats = {
+    this._stats = {
       hits: 0,
       misses: 0,
       sets: 0,
@@ -231,10 +232,10 @@ export class InMemoryCacheBackend implements CacheBackend {
    * Get statistics
    */
   async stats(): Promise<CacheStats> {
-    const total = this.stats.hits + this.stats.misses;
+    const total = this._stats.hits + this._stats.misses;
     return {
-      ...this.stats,
-      hitRate: total > 0 ? this.stats.hits / total : 0,
+      ...this._stats,
+      hitRate: total > 0 ? this._stats.hits / total : 0,
     };
   }
 
@@ -273,11 +274,11 @@ export class InMemoryCacheBackend implements CacheBackend {
     if (lruKey) {
       const entry = this.cache.get(lruKey);
       if (entry) {
-        this.stats.memoryUsage -= entry.size;
+        this._stats.memoryUsage -= entry.size;
       }
       this.cache.delete(lruKey);
-      this.stats.evictions++;
-      this.stats.size = this.cache.size;
+      this._stats.evictions++;
+      this._stats.size = this.cache.size;
       this.emit('evict', lruKey);
     }
   }
@@ -298,10 +299,10 @@ export class InMemoryCacheBackend implements CacheBackend {
     for (const key of expiredKeys) {
       const entry = this.cache.get(key);
       if (entry) {
-        this.stats.memoryUsage -= entry.size;
+        this._stats.memoryUsage -= entry.size;
       }
       this.cache.delete(key);
-      this.stats.size = this.cache.size;
+      this._stats.size = this.cache.size;
       this.emit('evict', key);
     }
   }
@@ -363,9 +364,10 @@ export class RedisCacheBackend implements CacheBackend {
     if (this.redis) return;
 
     try {
-      // Try to import ioredis
-      const Redis = await import('ioredis');
-      this.redis = new Redis(this.config.url, {
+      // Try to import ioredis (optional dependency, not installed by default)
+      const Redis = await (new Function('m', 'return import(m)'))('ioredis');
+      const RedisCtor = Redis.default || Redis;
+      this.redis = new RedisCtor(this.config.url, {
         retryStrategy: this.config.retryStrategy,
       });
     } catch (error) {
@@ -572,6 +574,7 @@ export class CacheManager {
       defaultTTL: options.defaultTTL || 3600000,
       enableMetrics: options.enableMetrics !== false,
       cleanupInterval: options.cleanupInterval || 60000,
+      redisUrl: options.redisUrl || '',
     };
     this.strategy = strategy;
   }
@@ -752,16 +755,24 @@ export async function createCacheManager(
   const redisUrl = process.env.REDIS_URL || options.redisUrl;
 
   if (redisUrl) {
+    // Probe ioredis availability eagerly so we can fall back instead of
+    // crashing on the first .get()/.set() call.
     try {
+      await (new Function('m', 'return import(m)'))('ioredis');
+      console.info('[cache] Using Redis backend (REDIS_URL configured)');
       return await createRedisCache(
         { url: redisUrl, prefix: 'markdly' },
         options
       );
     } catch (error) {
-      console.warn('Failed to create Redis cache, falling back to in-memory:', error);
+      console.warn(
+        '[cache] REDIS_URL is set but ioredis is not installed — falling back to in-memory cache. Install ioredis to enable Redis.',
+        error instanceof Error ? error.message : error
+      );
       return createInMemoryCache(options);
     }
   }
 
+  console.info('[cache] Using in-memory backend (no REDIS_URL set)');
   return createInMemoryCache(options);
 }

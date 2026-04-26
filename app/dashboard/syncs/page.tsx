@@ -50,14 +50,19 @@ export default async function SyncHistoryPage() {
             .from(documents)
             .where(inArray(documents.googleDocId, docIds));
 
-          const docMetadataMap = new Map(
-            trackedDocs.map((doc) => [doc.googleDocId, doc.metadata?.filePath])
+          const docMetadataMap = new Map<string, string | null | undefined>(
+            trackedDocs.map((doc) => [
+              doc.googleDocId as string,
+              (doc.metadata as { filePath?: string } | null)?.filePath,
+            ])
           );
 
           // Merge file path into history entries
           history = history.map((entry) => ({
             ...entry,
-            filePath: entry.filePath || (entry.docId ? docMetadataMap.get(entry.docId) : undefined),
+            filePath:
+              entry.filePath ||
+              (entry.docId ? docMetadataMap.get(entry.docId) ?? null : null),
           }));
         }
       }
@@ -68,7 +73,7 @@ export default async function SyncHistoryPage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Sync History</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Sync History</h1>
           <p className="text-muted-foreground">
             View the history of your document syncs
           </p>

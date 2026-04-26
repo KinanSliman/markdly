@@ -146,14 +146,14 @@ export function SyncHistoryList({ initialHistory }: SyncHistoryListProps) {
       {history.map((entry) => (
         <Card key={entry.id}>
           <CardContent className="pt-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{entry.docTitle || "Untitled"}</span>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="space-y-2 flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium break-words">{entry.docTitle || "Untitled"}</span>
                   {getStatusBadge(entry.status || "pending")}
                 </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   {entry.startedAt && (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -174,12 +174,12 @@ export function SyncHistoryList({ initialHistory }: SyncHistoryListProps) {
                   )}
                 </div>
                 {entry.errorMessage && (
-                  <p className="text-sm text-red-500 mt-2">
+                  <p className="text-sm text-red-500 mt-2 break-words">
                     Error: {entry.errorMessage}
                   </p>
                 )}
               </div>
-              <div className="ml-4 flex gap-2">
+              <div className="flex flex-wrap gap-2 sm:ml-4 sm:shrink-0">
                 {entry.status === "success" && entry.filePath && (
                   <>
                     <Dialog open={previewOpenSyncId === entry.id} onOpenChange={handlePreviewOpenChange}>
@@ -194,10 +194,10 @@ export function SyncHistoryList({ initialHistory }: SyncHistoryListProps) {
                           {previewLoading === entry.id ? "Loading..." : "Preview"}
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-5xl max-h-[85vh] p-0 gap-0">
-                        <div className="flex items-center justify-between px-6 py-4 border-b">
-                          <div>
-                            <DialogTitle className="text-lg font-semibold">
+                      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-5xl max-h-[90vh] sm:max-h-[85vh] p-0 gap-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-b">
+                          <div className="min-w-0 pr-8">
+                            <DialogTitle className="text-base sm:text-lg font-semibold break-words">
                               {previewContent?.fileName || "Document Preview"}
                             </DialogTitle>
                             <DialogDescription className="mt-1">
@@ -240,13 +240,13 @@ export function SyncHistoryList({ initialHistory }: SyncHistoryListProps) {
                           </div>
                         </div>
                         <div className="p-0">
-                          <div className="h-[55vh] overflow-auto bg-slate-50 dark:bg-slate-950/50 border-b">
-                            <pre className="p-6 text-sm font-mono leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+                          <div className="h-[60vh] sm:h-[55vh] overflow-auto bg-slate-50 dark:bg-slate-950/50 border-b">
+                            <pre className="p-4 sm:p-6 text-xs sm:text-sm font-mono leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
                               {previewContent?.content || "Loading..."}
                             </pre>
                           </div>
                           {previewContent?.isTruncated && (
-                            <div className="px-6 py-3 bg-amber-50 dark:bg-amber-900/20 border-t">
+                            <div className="px-4 sm:px-6 py-3 bg-amber-50 dark:bg-amber-900/20 border-t">
                               <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

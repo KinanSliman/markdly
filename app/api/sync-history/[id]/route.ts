@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. Check authentication
@@ -18,7 +18,7 @@ export async function DELETE(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -47,7 +47,7 @@ export async function DELETE(
       .from(syncHistory)
       .where(eq(syncHistory.id, id));
 
-    if (!historyEntry) {
+    if (!historyEntry || !historyEntry.syncConfigId) {
       return NextResponse.json(
         { error: "Sync history entry not found" },
         { status: 404 }

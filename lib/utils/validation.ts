@@ -514,7 +514,11 @@ export function validateSyncMode(mode: string): string {
  */
 export function validateDocxFile(file: File): File {
   if (!file || !(file instanceof File)) {
-    throw new InvalidFileError(file?.name || 'unknown', ['.docx']);
+    const fallbackName =
+      typeof (file as { name?: unknown })?.name === 'string'
+        ? (file as { name: string }).name
+        : 'unknown';
+    throw new InvalidFileError(fallbackName, ['.docx']);
   }
 
   // Check file extension

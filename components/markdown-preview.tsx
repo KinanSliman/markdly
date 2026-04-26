@@ -57,7 +57,7 @@ export function MarkdownPreview({ content, className = "" }: MarkdownPreviewProp
 
   return (
     <div
-      className={`prose prose-slate dark:prose-invert max-w-none text-left ${className}`}
+      className={`prose prose-sm sm:prose-base prose-slate dark:prose-invert max-w-none text-left break-words [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:break-words [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full [&_img]:max-w-full [&_img]:h-auto [&_a]:break-all ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/database";
 import { accounts, workspaces, githubConnections, googleConnections, syncConfigs, documents, syncHistory } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
             .where(eq(githubConnections.workspaceId, workspace.id));
         } catch (e) {
           // Ignore errors if no records exist
-          console.log("No GitHub connections to delete or already deleted");
+          logger.debug("No GitHub connections to delete or already deleted");
         }
       }
 
@@ -77,41 +78,41 @@ export async function POST(request: NextRequest) {
           .map((c) => c.id)
           .filter((id): id is string => id !== undefined);
 
-        console.log(`Found ${syncConfigIds.length} sync configs to delete`);
+        logger.debug(`Found ${syncConfigIds.length} sync configs to delete`);
 
         // Delete sync history for these sync configs (must be done before deleting sync configs)
         if (syncConfigIds.length > 0) {
           try {
-            const result = await db
+            await db
               .delete(syncHistory)
               .where(inArray(syncHistory.syncConfigId, syncConfigIds));
-            console.log(`Deleted sync history entries`);
+            logger.debug(`Deleted sync history entries`);
           } catch (e) {
-            console.log("Error deleting sync history:", e);
+            logger.error("Error deleting sync history:", e);
           }
         }
 
         // Delete tracked documents for these sync configs
         if (syncConfigIds.length > 0) {
           try {
-            const result = await db
+            await db
               .delete(documents)
               .where(inArray(documents.syncConfigId, syncConfigIds));
-            console.log(`Deleted tracked documents`);
+            logger.debug(`Deleted tracked documents`);
           } catch (e) {
-            console.log("Error deleting tracked documents:", e);
+            logger.error("Error deleting tracked documents:", e);
           }
         }
 
         // Delete sync configs
         if (googleConnIds.length > 0) {
           try {
-            const result = await db
+            await db
               .delete(syncConfigs)
               .where(inArray(syncConfigs.googleConnectionId, googleConnIds));
-            console.log(`Deleted sync configs`);
+            logger.debug(`Deleted sync configs`);
           } catch (e) {
-            console.log("Error deleting sync configs:", e);
+            logger.error("Error deleting sync configs:", e);
           }
         }
       }
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
             .where(eq(googleConnections.workspaceId, workspace.id));
         } catch (e) {
           // Ignore errors if no records exist
-          console.log("No Google connections to delete or already deleted");
+          logger.debug("No Google connections to delete or already deleted");
         }
       }
 

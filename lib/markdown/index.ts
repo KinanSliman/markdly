@@ -17,4 +17,7 @@ export {
 } from "./unified-converter";
 
 // Front matter utilities
-export { generateFrontMatter, type FrontmatterTemplate } from "./frontmatter";
+export {
+  generateFrontMatter,
+  type FrontMatterData as FrontmatterTemplate,
+} from "./frontmatter";

@@ -18,8 +18,8 @@ export default async function DashboardPage() {
       <DashboardShell>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Welcome to Markdly</h1>
-            <p className="text-muted-foreground text-lg max-w-md">
+            <h1 className="text-2xl sm:text-3xl font-bold">Welcome to Markdly</h1>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-md">
               Turn Google Docs into GitHub-ready Markdown. Sign in to get started.
             </p>
           </div>
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
             Welcome back, {session.user?.name || "User"}!
           </p>

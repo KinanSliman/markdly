@@ -100,6 +100,8 @@ export interface CacheMetrics {
   memoryUsage: number;
   /** Number of evictions */
   evictions: number;
+  /** Timestamp of measurement */
+  timestamp?: number;
 }
 
 /**

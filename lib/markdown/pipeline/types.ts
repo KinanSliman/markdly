@@ -5,7 +5,9 @@
  * Each stage in the pipeline has a clear input/output contract.
  */
 
-import { ConversionWarning } from '../converter';
+import type { ConversionWarning } from '../unified-converter';
+
+export type { ConversionWarning };
 
 // ============================================================================
 // Core Pipeline Types
@@ -265,4 +267,8 @@ export interface PerformanceReport {
 // Export all types
 // ============================================================================
 
-export * from '../converter';
+export type {
+  ConversionInput,
+  ConversionOutput,
+  ConversionMetrics,
+} from '../unified-converter';

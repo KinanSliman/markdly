@@ -39,7 +39,7 @@ export function ReconnectGoogleButton() {
     } catch (error) {
       // The signIn function with redirect: true will throw an error when redirecting
       // This is expected behavior, so we don't show an error toast
-      console.log("Redirect error (expected):", error);
+      // Redirect error from signIn() is expected; no-op
     } finally {
       // Reset loading state in case redirect fails
       setIsLoading(false);

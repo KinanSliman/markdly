@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/database";
 import { users, syncHistory, analytics } from "@/db/schema";
-import { eq, gt, count, sql } from "drizzle-orm";
+import { eq, gt, count, sql, and, isNotNull } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const [activeUsersResult] = await db
       .select({ count: count() })
       .from(users)
-      .where(users.lastLogin.isNotNull().and(gt(users.lastLogin, thirtyDaysAgo)));
+      .where(and(isNotNull(users.lastLogin), gt(users.lastLogin, thirtyDaysAgo)));
 
     // Get total syncs
     const [totalSyncsResult] = await db

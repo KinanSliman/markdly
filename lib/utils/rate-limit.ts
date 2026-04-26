@@ -172,3 +172,98 @@ export async function withRateLimitAll<T>(
   const promises = fns.map((fn) => withRateLimit(fn, limiter));
   return Promise.all(promises);
 }
+
+// ============================================================================
+// Per-key sliding-window limiter for API request abuse prevention
+// ============================================================================
+
+interface RequestBucket {
+  hits: number[];
+  lastSeen: number;
+}
+
+interface RequestRateLimitOptions {
+  /** Maximum requests allowed within the window. */
+  limit: number;
+  /** Window duration in milliseconds. */
+  windowMs: number;
+  /** Maximum keys to track before evicting the oldest (LRU). */
+  maxKeys?: number;
+}
+
+export interface RequestRateLimitResult {
+  success: boolean;
+  remaining: number;
+  resetAt: number;
+  retryAfterSeconds: number;
+}
+
+const requestBuckets = new Map<string, RequestBucket>();
+
+/**
+ * Sliding-window per-key request limiter for HTTP route handlers.
+ *
+ * Caveats: per-process state. On serverless / multi-instance deploys the
+ * effective limit is multiplied by the number of warm instances. For
+ * production-grade protection, swap in a Redis/Upstash backend.
+ */
+export function checkRequestRate(
+  key: string,
+  { limit, windowMs, maxKeys = 5000 }: RequestRateLimitOptions
+): RequestRateLimitResult {
+  const now = Date.now();
+  const cutoff = now - windowMs;
+
+  let bucket = requestBuckets.get(key);
+  if (!bucket) {
+    bucket = { hits: [], lastSeen: now };
+    requestBuckets.set(key, bucket);
+  }
+
+  bucket.hits = bucket.hits.filter((t) => t > cutoff);
+  bucket.lastSeen = now;
+
+  // Evict oldest key if we're tracking too many
+  if (requestBuckets.size > maxKeys) {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+    for (const [k, v] of requestBuckets) {
+      if (v.lastSeen < oldestTime) {
+        oldestTime = v.lastSeen;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) requestBuckets.delete(oldestKey);
+  }
+
+  const exceeded = bucket.hits.length >= limit;
+  if (!exceeded) bucket.hits.push(now);
+
+  const oldest = bucket.hits[0] ?? now;
+  const resetAt = oldest + windowMs;
+  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt - now) / 1000));
+
+  return {
+    success: !exceeded,
+    remaining: Math.max(0, limit - bucket.hits.length),
+    resetAt,
+    retryAfterSeconds,
+  };
+}
+
+/**
+ * Best-effort client identifier from common proxy headers. Used as a
+ * rate-limit key for unauthenticated public endpoints.
+ */
+export function getClientIdentifier(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const real = request.headers.get("x-real-ip");
+  if (real) return real;
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp;
+  return "unknown";
+}

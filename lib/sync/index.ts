@@ -31,6 +31,7 @@ import {
   shouldSkipSync,
   getChangeDescription,
 } from "@/lib/sync/change-detector";
+import { logger } from "@/lib/logger";
 
 export interface SyncResult {
   success: boolean;
@@ -141,7 +142,7 @@ export async function executeSync({
         errorMessage.includes("Invalid Credentials") ||
         errorMessage.includes("invalid_grant")
       ) {
-        console.log("Google access token expired, refreshing...");
+        logger.info("Google access token expired, refreshing");
 
         if (googleConn.refreshToken) {
           try {
@@ -223,23 +224,24 @@ export async function executeSync({
       .from(documents)
       .where(eq(documents.googleDocId, docId));
 
+    const existingMetadata = (existingDoc?.metadata as Record<string, any> | null) || null;
     const changeResult = detectDocumentChanges(
-      existingDoc?.metadata?.content || null,
+      (existingMetadata?.content as string | undefined) || null,
       finalContent,
       existingDoc
         ? {
-            title: existingDoc.title,
-            contentHash: existingDoc.contentHash,
-            paragraphCount: existingDoc.metadata?.paragraphCount,
-            tableCount: existingDoc.metadata?.tableCount,
-            imageCount: existingDoc.metadata?.imageCount,
+            title: existingDoc.title ?? undefined,
+            contentHash: existingDoc.contentHash ?? undefined,
+            paragraphCount: existingMetadata?.paragraphCount,
+            tableCount: existingMetadata?.tableCount,
+            imageCount: existingMetadata?.imageCount,
           }
         : null,
       {
         title: googleDoc.name,
-        paragraphCount: converted.metadata?.paragraphCount,
-        tableCount: converted.metadata?.tableCount,
-        imageCount: converted.metadata?.imageCount,
+        paragraphCount: converted.content.split("\n\n").length,
+        tableCount: converted.tables.length,
+        imageCount: converted.images.length,
       },
       docId,
     );
@@ -273,10 +275,10 @@ export async function executeSync({
             contentHash: changeResult.hashComparison.newHash,
             contentSize: finalContent.length,
             metadata: {
-              ...existingDoc.metadata,
-              paragraphCount: converted.metadata?.paragraphCount,
-              tableCount: converted.metadata?.tableCount,
-              imageCount: converted.metadata?.imageCount,
+              ...(existingMetadata || {}),
+              paragraphCount: converted.content.split("\n\n").length,
+              tableCount: converted.tables.length,
+              imageCount: converted.images.length,
             },
           })
           .where(eq(documents.googleDocId, docId));
@@ -334,9 +336,9 @@ export async function executeSync({
             commitSha,
             prNumber,
             prUrl,
-            paragraphCount: converted.metadata?.paragraphCount,
-            tableCount: converted.metadata?.tableCount,
-            imageCount: converted.metadata?.imageCount,
+            paragraphCount: converted.content.split("\n\n").length,
+            tableCount: converted.tables.length,
+            imageCount: converted.images.length,
           },
         })
         .where(eq(documents.googleDocId, docId));
@@ -354,9 +356,9 @@ export async function executeSync({
           commitSha,
           prNumber,
           prUrl,
-          paragraphCount: converted.metadata?.paragraphCount,
-          tableCount: converted.metadata?.tableCount,
-          imageCount: converted.metadata?.imageCount,
+          paragraphCount: converted.content.split("\n\n").length,
+          tableCount: converted.tables.length,
+          imageCount: converted.images.length,
         },
       });
     }
@@ -378,7 +380,9 @@ export async function executeSync({
       .where(eq(syncHistory.id, syncHistoryId!));
 
     // 17. Track analytics event
-    await trackSync(userId, configId, syncConfig.mode, true, {
+    const trackedMode: "github" | "convert-only" =
+      syncConfig.mode === "convert-only" ? "convert-only" : "github";
+    await trackSync(userId, configId, trackedMode, true, {
       docTitle: googleDoc.name,
       filePath,
       prUrl,
@@ -417,7 +421,9 @@ export async function executeSync({
         .where(eq(syncConfigs.id, configId));
 
       if (syncConfig) {
-        await trackSync(userId, configId, syncConfig.mode, false, {
+        const failedMode: "github" | "convert-only" =
+          syncConfig.mode === "convert-only" ? "convert-only" : "github";
+        await trackSync(userId, configId, failedMode, false, {
           errorMessage,
         });
       }

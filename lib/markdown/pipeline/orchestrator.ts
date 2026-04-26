@@ -47,12 +47,29 @@ export class PipelineOrchestrator {
 
       if (cached) {
         // Return cached result with updated metrics
+        const stages = cached.metrics?.stages || {};
         return {
-          ...cached,
+          content: cached.content,
+          metadata: {
+            title: cached.metadata.title,
+            paragraphCount: 0,
+            tableCount: cached.metadata.tables,
+            imageCount: cached.metadata.images,
+            codeBlockCount: 0,
+            headingCount: cached.metadata.headings?.length || 0,
+            characterCount: cached.content.length,
+            timestamp: Date.now(),
+          },
+          warnings: (cached.metadata.warnings || []) as PipelineOutput['warnings'],
           metrics: {
-            ...cached.metrics,
-            cached: true,
             totalTime: performance.now() - startTime,
+            fetchTime: stages.fetch || 0,
+            parseTime: stages.parse || 0,
+            processTime: stages.process || 0,
+            imageUploadTime: stages.imageUpload || 0,
+            formatTime: stages.format || 0,
+            validateTime: stages.validate || 0,
+            cached: true,
           },
         };
       }
@@ -95,9 +112,25 @@ export class PipelineOrchestrator {
             input.fileType || 'html',
             {
               content: output.content,
-              metadata: output.metadata,
-              warnings: output.warnings,
-              metrics: output.metrics,
+              metadata: {
+                title: output.metadata.title,
+                headings: [],
+                tables: output.metadata.tableCount,
+                images: output.metadata.imageCount,
+                warnings: output.warnings,
+              },
+              metrics: {
+                totalTime: output.metrics.totalTime,
+                stages: {
+                  fetch: output.metrics.fetchTime,
+                  parse: output.metrics.parseTime,
+                  process: output.metrics.processTime,
+                  imageUpload: output.metrics.imageUploadTime,
+                  format: output.metrics.formatTime,
+                  validate: output.metrics.validateTime,
+                },
+                cached: output.metrics.cached || false,
+              },
               cacheInfo: {
                 cachedAt: Date.now(),
                 ttl: this.config.cacheTTL || 3600000, // 1 hour default
@@ -212,7 +245,7 @@ export class PipelineOrchestrator {
       // Record stage success
       if (this.config.collectMetrics) {
         const stageTime = performance.now() - stageStartTime;
-        context.metrics[`${stage.name}Time` as keyof PipelineMetrics] = stageTime as any;
+        (context.metrics as Record<string, any>)[`${stage.name}Time`] = stageTime;
       }
     } catch (error: any) {
       // Cleanup on error

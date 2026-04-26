@@ -11,6 +11,7 @@ import { listAllAccessibleDocsByUserId, GoogleReconnectRequiredError } from "@/l
 import { SyncButton } from "@/components/forms/sync-button";
 import { ReconnectGoogleButton } from "@/components/forms/reconnect-google-button";
 import { FileText, Calendar, GitCommit } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 export default async function SyncConfigsPage() {
   const session = await auth();
@@ -67,19 +68,18 @@ export default async function SyncConfigsPage() {
 
   if (googleAccount) {
     try {
-      console.log("Attempting to list all accessible Google Docs...");
+      logger.debug("Attempting to list all accessible Google Docs...");
       // Use the new function that searches for all accessible Google Docs
       // This includes docs in root, shared docs, and docs in subdirectories
       // It also handles token refresh automatically if needed
       const docs = await listAllAccessibleDocsByUserId(session.user.id!);
-      console.log("Google Docs found:", docs.length);
+      logger.debug("Google Docs found:", docs.length);
       googleDocs = docs.map((doc) => ({
         id: doc.id,
         name: doc.name,
       }));
-      console.log("Google Docs:", googleDocs);
     } catch (error) {
-      console.error("Error fetching Google Docs:", error);
+      logger.error("Error fetching Google Docs:", error);
       // Check if this is a reconnection error
       if (error instanceof GoogleReconnectRequiredError) {
         googleReconnectRequired = true;
@@ -87,7 +87,7 @@ export default async function SyncConfigsPage() {
       }
     }
   } else {
-    console.log("No Google account found");
+    logger.debug("No Google account found");
   }
 
   // Get existing sync configs
@@ -116,7 +116,7 @@ export default async function SyncConfigsPage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Sync Configurations</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Sync Configurations</h1>
           <p className="text-muted-foreground">
             Configure how your Google Docs sync to GitHub repositories
           </p>
@@ -210,15 +210,15 @@ export default async function SyncConfigsPage() {
                   {configs.map((config) => (
                     <div
                       key={config.id}
-                      className="flex items-center justify-between rounded-lg border p-4"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border p-4"
                     >
-                      <div>
-                        <p className="font-medium">{config.name}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{config.name}</p>
+                        <p className="text-sm text-muted-foreground break-words">
                           {config.framework} • {config.outputPath}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs px-2 py-1 rounded bg-muted">
                           {config.syncSchedule}
                         </span>
@@ -241,19 +241,19 @@ export default async function SyncConfigsPage() {
                   {trackedDocs.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center justify-between rounded-lg border p-4"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border p-4"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{doc.title || "Untitled"}</span>
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium break-words">{doc.title || "Untitled"}</span>
                           {doc.syncConfig?.mode === "convert-only" && (
                             <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
                               Convert Only
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           {doc.lastSynced && (
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
@@ -268,11 +268,13 @@ export default async function SyncConfigsPage() {
                           )}
                         </div>
                       </div>
-                      <SyncButton
-                        docId={doc.googleDocId!}
-                        docName={doc.title!}
-                        mode={doc.syncConfig?.mode || "github"}
-                      />
+                      <div className="shrink-0 w-full sm:w-auto">
+                        <SyncButton
+                          docId={doc.googleDocId!}
+                          docName={doc.title!}
+                          mode={(doc.syncConfig?.mode === "convert-only" ? "convert-only" : "github")}
+                        />
+                      </div>
                     </div>
                   ))}
                 </CardContent>
